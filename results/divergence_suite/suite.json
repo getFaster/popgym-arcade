@@ -1,0 +1,21 @@
+{
+  "tasks": [
+    "CartPoleHard",
+    "NavigatorEasy",
+    "MineSweeperEasy",
+    "BreakoutEasy"
+  ],
+  "conditions": [
+    "mlp",
+    "lru",
+    "information_bottleneck",
+    "ib_reverse_kl",
+    "ib_symmetric_kl",
+    "ib_renyi_half"
+  ],
+  "seeds": [
+    0
+  ],
+  "requested_steps": 100000,
+  "device": "NVIDIA GeForce RTX 2060 with Max-Q Design"
+}

@@ -13,3 +13,7 @@ build/
 plotting/fpsdata/
 plotting/gradientdata/
 wandb/
+# Reproducible experiment logs are retained; large weights stay local.
+results/**/model.eqx
+!results/**/summary.csv
+results/development_checks/lru_serial_incomplete/

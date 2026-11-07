@@ -1,0 +1,9 @@
+{
+  "device": "NVIDIA GeForce RTX 2060 with Max-Q Design",
+  "sequence_length": 128,
+  "hidden": 512,
+  "layers": 2,
+  "max_absolute_state_difference": 1.3011879218538525e-07,
+  "max_absolute_logit_difference": 4.76837158203125e-07,
+  "passed": true
+}
