@@ -7,6 +7,11 @@ from equinox import nn
 
 from popgym_arcade.baselines.model.builder import ActorCritic
 
+DEFAULT_IB_VARIANT = "ib_reverse_prior20"
+DEFAULT_IB_POSTERIOR_INPUT = "output"
+DEFAULT_IB_RESIDUAL = True
+DEFAULT_IB_NORMALIZATION = "fixed_rms"
+
 ORIGINAL_VARIANTS = (
     "mlp",
     "lru",
@@ -14,12 +19,43 @@ ORIGINAL_VARIANTS = (
     "state_dropout",
     "information_bottleneck",
 )
+DEFAULT_VARIANTS = tuple(
+    DEFAULT_IB_VARIANT if variant == "information_bottleneck" else variant
+    for variant in ORIGINAL_VARIANTS
+)
+
+
+def resolve_memory_options(variant, posterior_input=None, residual=None):
+    """IB uses residual output by default; vanilla controls retain their defaults."""
+    is_ib = variant in IB_DIVERGENCES
+    if posterior_input is None:
+        posterior_input = DEFAULT_IB_POSTERIOR_INPUT if is_ib else "state"
+    if residual is None:
+        residual = DEFAULT_IB_RESIDUAL if is_ib else False
+    if posterior_input not in ("state", "output"):
+        raise ValueError("posterior_input must be state or output")
+    return posterior_input, residual
+
+
 IB_DIVERGENCES = {
     "information_bottleneck": "forward_kl",
     "ib_reverse_kl": "reverse_kl",
     "ib_symmetric_kl": "symmetric_kl",
     "ib_renyi_half": "renyi_half",
 }
+# Prior/posterior gradient weights sum to two, preserving the original
+# (1, 1) gradient at alpha=0.5 rather than halving the auxiliary loss.
+KL_BALANCES = {
+    f"ib_{direction}_prior{int(alpha * 100)}": alpha
+    for direction in ("forward", "reverse", "symmetric", "renyi_half")
+    for alpha in (0.2, 0.8)
+}
+IB_DIVERGENCES.update(
+    {
+        name: ("renyi_half" if "renyi_half" in name else name.split("_")[1] + "_kl")
+        for name in KL_BALANCES
+    }
+)
 VARIANTS = ORIGINAL_VARIANTS + tuple(
     k for k in IB_DIVERGENCES if k not in ORIGINAL_VARIANTS
 )
@@ -55,6 +91,20 @@ def gaussian_divergence(pm, pl, qm, ql, kind):
         variance_term = log_average_variance - 0.5 * (pl + ql)
         return jnp.maximum(0.0, jnp.sum(mean_term + variance_term, axis=-1))
     raise ValueError(f"Unknown Gaussian divergence: {kind}")
+
+
+def balanced_divergence(pm, pl, qm, ql, kind, alpha=0.5):
+    """Original divergence value; prior/posterior gradients weighted 2a/2(1-a)."""
+    if not 0 <= alpha <= 1:
+        raise ValueError("Prior balance must be in [0, 1]")
+    if alpha == 0.5:
+        return gaussian_divergence(pm, pl, qm, ql, kind)
+    sg = jax.lax.stop_gradient
+    prior = gaussian_divergence(pm, pl, sg(qm), sg(ql), kind)
+    posterior = gaussian_divergence(sg(pm), sg(pl), qm, ql, kind)
+    weighted = 2 * alpha * prior + 2 * (1 - alpha) * posterior
+    # Preserve raw divergence metrics and the existing one-bit free region.
+    return sg(prior) + (weighted - sg(weighted))
 
 
 def free_bit(kl):
@@ -125,8 +175,26 @@ class Branch(eqx.Module):
     layers: int = eqx.field(static=True)
     latent_dim: int = eqx.field(static=True)
     dropout: float = eqx.field(static=True)
+    posterior_input: str = eqx.field(static=True)
+    residual: bool = eqx.field(static=True)
 
-    def __init__(self, cnn, variant, output_size, hidden, layers, dropout, key):
+    def __init__(
+        self,
+        cnn,
+        variant,
+        output_size,
+        hidden,
+        layers,
+        dropout,
+        key,
+        posterior_input=None,
+        residual=None,
+    ):
+        posterior_input, residual = resolve_memory_options(
+            variant, posterior_input, residual
+        )
+        self.posterior_input = posterior_input
+        self.residual = residual
         keys = jax.random.split(key, layers + 5)
         self.cnn, self.variant = cnn, variant
         self.hidden, self.layers, self.dropout = hidden, layers, dropout
@@ -150,7 +218,11 @@ class Branch(eqx.Module):
             nn.Linear(518, 2 * self.latent_dim, key=keys[-4]) if is_ib else None
         )
         self.posterior = (
-            nn.Linear(518 + 2 * hidden * layers, 2 * self.latent_dim, key=keys[-3])
+            nn.Linear(
+                518 + (hidden if posterior_input == "output" else 2 * hidden * layers),
+                2 * self.latent_dim,
+                key=keys[-3],
+            )
             if is_ib
             else None
         )
@@ -184,17 +256,34 @@ class Branch(eqx.Module):
             masks = jax.random.bernoulli(key, 1 - self.dropout, state.shape)
         states, y = [], x
         for i, cell in enumerate(self.cells):
+            previous = y
             s, y = cell(state[i], y, masks[i])
+            if self.residual and i > 0:
+                y = y + previous
             states.append(s)
         state = jnp.stack(states)
         kl = jnp.array(0.0)
         if self.variant in IB_DIVERGENCES:
             flat_state = jnp.concatenate((state.real.ravel(), state.imag.ravel()))
             pm, pl = jnp.split(self.prior(x), 2)
-            qm, ql = jnp.split(self.posterior(jnp.concatenate((x, flat_state))), 2)
+            qm, ql = jnp.split(
+                self.posterior(
+                    jnp.concatenate(
+                        (x, y if self.posterior_input == "output" else flat_state)
+                    )
+                ),
+                2,
+            )
             pl, ql = jnp.clip(pl, -10, 10), jnp.clip(ql, -10, 10)
-            kl = gaussian_divergence(pm, pl, qm, ql, IB_DIVERGENCES[self.variant])
-            features = jnp.concatenate((x, pm, pl))
+            kl = balanced_divergence(
+                pm,
+                pl,
+                qm,
+                ql,
+                IB_DIVERGENCES[self.variant],
+                KL_BALANCES.get(self.variant, 0.5),
+            )
+            features = jnp.concatenate((x, qm, ql))
         else:
             features = jnp.concatenate((x, self.memory_projection(y)))
         return state, self.head(features), kl
@@ -216,6 +305,7 @@ class Branch(eqx.Module):
 
         layer_states, y = [], inputs
         for i, cell in enumerate(self.cells):
+            previous = y
             eigenvalue = jnp.exp(-jnp.exp(cell.nu) + 1j * jnp.exp(cell.theta))
             factors = jnp.where(done[:, None], 0.0, eigenvalue * masks[:, i])
             b = jnp.exp(cell.gamma)[:, None] * (cell.b_real + 1j * cell.b_imag)
@@ -224,6 +314,8 @@ class Branch(eqx.Module):
             states = factors * initial_state[i] + offsets
             c = cell.c_real + 1j * cell.c_imag
             y = jax.nn.leaky_relu(jnp.real(states @ c.T) + y @ cell.skip.T)
+            if self.residual and i > 0:
+                y = y + previous
             layer_states.append(states)
         states = jnp.stack(layer_states, axis=1)
         kl = jnp.zeros(inputs.shape[0])
@@ -238,14 +330,24 @@ class Branch(eqx.Module):
             pm, pl = jnp.split(jax.vmap(self.prior)(inputs), 2, axis=-1)
             qm, ql = jnp.split(
                 jax.vmap(self.posterior)(
-                    jnp.concatenate((inputs, flat_state), axis=-1)
+                    jnp.concatenate(
+                        (inputs, y if self.posterior_input == "output" else flat_state),
+                        axis=-1,
+                    )
                 ),
                 2,
                 axis=-1,
             )
             pl, ql = jnp.clip(pl, -10, 10), jnp.clip(ql, -10, 10)
-            kl = gaussian_divergence(pm, pl, qm, ql, IB_DIVERGENCES[self.variant])
-            features = jnp.concatenate((inputs, pm, pl), axis=-1)
+            kl = balanced_divergence(
+                pm,
+                pl,
+                qm,
+                ql,
+                IB_DIVERGENCES[self.variant],
+                KL_BALANCES.get(self.variant, 0.5),
+            )
+            features = jnp.concatenate((inputs, qm, ql), axis=-1)
         else:
             features = jnp.concatenate(
                 (inputs, jax.vmap(self.memory_projection)(y)), axis=-1
@@ -258,15 +360,40 @@ class MemoryActorCritic(eqx.Module):
     critic: Branch
 
     def __init__(
-        self, variant, key, *, hidden=512, layers=2, dropout=0.1, obs_size=128
+        self,
+        variant,
+        key,
+        *,
+        hidden=512,
+        layers=2,
+        dropout=0.1,
+        obs_size=128,
+        posterior_input=None,
+        residual=None,
     ):
         cnn_key, actor_key, critic_key = jax.random.split(key, 3)
         upstream = ActorCritic(cnn_key, obs_size)
         self.actor = Branch(
-            upstream.actor_cnn, variant, 5, hidden, layers, dropout, actor_key
+            upstream.actor_cnn,
+            variant,
+            5,
+            hidden,
+            layers,
+            dropout,
+            actor_key,
+            posterior_input,
+            residual,
         )
         self.critic = Branch(
-            upstream.critic_cnn, variant, 1, hidden, layers, dropout, critic_key
+            upstream.critic_cnn,
+            variant,
+            1,
+            hidden,
+            layers,
+            dropout,
+            critic_key,
+            posterior_input,
+            residual,
         )
 
     def initial_state(self, batch_size):
@@ -326,3 +453,10 @@ class MemoryActorCritic(eqx.Module):
             return carry, (logits, value, kl)
 
         return jax.lax.scan(body, state, (encoded, done, keys))
+
+
+def normalized_excess(divergence_nats, scale_bits):
+    """Fixed RMS scaling after the raw full-event one-bit free region."""
+    return jnp.maximum(
+        divergence_nats / jnp.log(2.0) - 1.0, 0.0
+    ) / jax.lax.stop_gradient(scale_bits)

@@ -17,7 +17,10 @@ import jax
 import numpy as np
 
 from popgym_arcade.experiments.memory_bias import run_one, upstream_config
-from popgym_arcade.experiments.memory_models import IB_DIVERGENCES
+from popgym_arcade.experiments.memory_models import IB_DIVERGENCES, KL_BALANCES
+
+# Keep the original suite and its reports unchanged.
+IB_DIVERGENCES = {k: v for k, v in IB_DIVERGENCES.items() if k not in KL_BALANCES}
 
 TASKS = ("CartPoleHard", "NavigatorEasy", "MineSweeperEasy", "BreakoutEasy")
 CONDITIONS = ("mlp", "lru", *IB_DIVERGENCES)
@@ -275,6 +278,9 @@ def main():
         options = SimpleNamespace(
             timesteps=args.timesteps,
             output=args.output / task,
+            posterior_input="state",
+            lru_residual=False,
+            ib_normalization="none",
             hidden=512,
             layers=2,
             dropout=0.1,

@@ -1,3 +1,43 @@
+## Current default IB preset
+
+The repository's provisional IB default is **`ib_reverse_prior20`**:
+reverse KL `KL(posterior || prior)`, posterior memory input `output`, and
+prior/posterior auxiliary gradient weights **0.4/1.6** (shares 20%/80%).
+Both RL heads receive current input plus posterior mean/log variance, without
+sampling. Added inter-layer LRU residuals are enabled for IB; vanilla controls
+retain their existing defaults. The auxiliary objective remains coefficient 1,
+with a one-bit full-distribution free region and frozen branch-specific RMS
+normalization of the excess above that region.
+
+`memory_bias` replaces the historical IB entry in its default five-condition
+comparison with this preset. For the preset, it automatically calibrates all
+four divergences on a shared 2,048-sample random-policy trajectory at default
+rollout sizes, saves the calibration under `<output>/_calibration/`, and freezes
+its scales. Calibration is specific to task, observation mode, seed, model
+size, posterior input, residual setting, observation size, and rollout shape.
+A supplied `--rms-calibration FILE` is validated against those settings.
+
+```bash
+JAX_PLATFORMS=cuda XLA_PYTHON_CLIENT_PREALLOCATE=false \
+uv run python -m popgym_arcade.experiments.memory_bias \
+  --variants ib_reverse_prior20 --timesteps 100000 --seeds 0 \
+  --output results/default_ib_new_run
+```
+
+`--posterior-input state`, `--no-lru-residual`, and
+`--ib-normalization none` explicitly override the preset. Other named
+divergence/balancing variants remain available; use `--ib-normalization
+fixed_rms` to request automatic calibration for them. The explicitly named
+`information_bottleneck` variant retains historical forward-KL/unbalanced
+semantics; its name is not silently remapped. Fixed-condition suite runners
+continue to specify their own architectures. Use fresh output directories
+when changing settings. This is a provisional configuration choice from the
+single-seed sweep, not a claim of consistent superiority over vanilla LRU.
+
+---
+
+> **Superseded implementation:** historical IB results below used prior statistics at the RL heads and are invalid for the intended posterior-head experiment. Existing artifacts are retained for provenance.
+
 # Memory-bias regularization experiment
 
 The approved pilot compares one MLP reference with an LRU baseline and three separate variants on fully observed `CartPoleHard`. All agents use `input_t = (a_{t-1}, r_{t-1}, o_t)`. The action is one-hot encoded, reward is scalar, and the RGB observation passes through the upstream CNN. Episode starts use zero action/reward sentinels and reset both recurrent states.

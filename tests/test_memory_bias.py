@@ -48,7 +48,7 @@ def make_branch(variant):
     return Branch(eqx.nn.Sequential([]), variant, 5, 6, 2, 0.5, jax.random.PRNGKey(0))
 
 
-def test_ib_parameters_and_state_independent_heads():
+def test_ib_parameters_and_state_dependent_heads():
     branch = make_branch("information_bottleneck")
     assert branch.latent_dim == (2 * (2 * 6 * 2)) // 3
     assert branch.head.layers[0].in_features == 518 + 2 * branch.latent_dim
@@ -57,7 +57,7 @@ def test_ib_parameters_and_state_independent_heads():
     key = jax.random.PRNGKey(2)
     _, logits0, kl0 = branch.step(state * 0, x, False, key, True)
     _, logits1, kl1 = branch.step(state, x, False, key, True)
-    np.testing.assert_array_equal(logits0, logits1)
+    assert not np.allclose(logits0, logits1)
     assert not np.isclose(kl0, kl1)
     assert jnp.isfinite(kl0)
 
@@ -295,3 +295,271 @@ def test_evaluation_allows_terminal_step_after_nominal_horizon():
 
     scores = evaluate(Policy(), LateTerminalEnv(), None, 0, 16, 4, 32)
     np.testing.assert_array_equal(scores, jnp.full(64, 33.0))
+
+
+@pytest.mark.parametrize("kind", ["forward_kl", "reverse_kl"])
+@pytest.mark.parametrize("alpha", [0.0, 0.2, 0.5, 0.8, 1.0])
+def test_kl_balance_values_and_gradient_routing(kind, alpha):
+    from popgym_arcade.experiments.memory_models import balanced_divergence
+
+    args = tuple(
+        jnp.array(x) for x in ([2.0, -1.0], [0.2, -0.3], [-0.5, 0.4], [-0.1, 0.5])
+    )
+    original = lambda *xs: free_bit(gaussian_divergence(*xs, kind))
+    balanced = lambda *xs: free_bit(balanced_divergence(*xs, kind, alpha))
+    np.testing.assert_allclose(balanced(*args), original(*args), rtol=1e-6)
+    base = jax.grad(original, argnums=(0, 1, 2, 3))(*args)
+    actual = jax.grad(balanced, argnums=(0, 1, 2, 3))(*args)
+    for i, (a, b) in enumerate(zip(actual, base)):
+        np.testing.assert_allclose(
+            a, b * (2 * alpha if i < 2 else 2 * (1 - alpha)), atol=1e-6, rtol=1e-6
+        )
+    zeros = (jnp.zeros(2),) * 4
+    for grad in jax.grad(balanced, argnums=(0, 1, 2, 3))(*zeros):
+        np.testing.assert_array_equal(grad, 0)
+
+
+@pytest.mark.parametrize("residual", [False, True])
+def test_output_posterior_replay(residual):
+    branch = Branch(
+        eqx.nn.Sequential([]),
+        "ib_forward_prior20",
+        5,
+        6,
+        2,
+        0.0,
+        jax.random.PRNGKey(0),
+        posterior_input="output",
+        residual=residual,
+    )
+    assert branch.posterior.in_features == 518 + 6
+    assert branch.latent_dim == 16
+    xs = jax.random.normal(jax.random.PRNGKey(1), (4, 518))
+    dones = jnp.array([False, False, True, False])
+    keys = jax.random.split(jax.random.PRNGKey(2), 4)
+    initial = jnp.ones((2, 6), jnp.complex64)
+    state = initial
+    logits, losses = [], []
+    for x, done, key in zip(xs, dones, keys):
+        state, logit, loss = branch.step(state, x, done, key, True)
+        logits.append(logit)
+        losses.append(loss)
+    replay_state, replay_logits, replay_losses = branch.parallel_sequence(
+        initial, xs, dones, keys, True
+    )
+    np.testing.assert_allclose(state, replay_state, atol=1e-5)
+    np.testing.assert_allclose(jnp.stack(logits), replay_logits, atol=1e-5)
+    np.testing.assert_allclose(jnp.stack(losses), replay_losses, rtol=1e-5)
+
+
+def test_normalized_excess_free_region_and_detached_scale():
+    from popgym_arcade.experiments.memory_models import normalized_excess
+
+    log2 = jnp.log(2.0)
+    assert float(normalized_excess(0.5 * log2, 4.0)) == 0.0
+    np.testing.assert_allclose(normalized_excess(3.0 * log2, 4.0), 0.5)
+    np.testing.assert_allclose(
+        jax.grad(normalized_excess, argnums=0)(3.0 * log2, 4.0),
+        1 / (4 * np.log(2)),
+        rtol=1e-6,
+    )
+    assert float(jax.grad(normalized_excess, argnums=1)(3.0 * log2, 4.0)) == 0.0
+
+
+@pytest.mark.parametrize("posterior_input", ["state", "output"])
+def test_posterior_head_has_memory_gradient(posterior_input):
+    branch = Branch(
+        eqx.nn.Sequential([]),
+        "ib_forward_prior20",
+        5,
+        6,
+        2,
+        0.0,
+        jax.random.PRNGKey(0),
+        posterior_input=posterior_input,
+        residual=True,
+    )
+    x = jnp.ones(518)
+    key = jax.random.PRNGKey(1)
+
+    def objective(real_state):
+        return branch.step(real_state.astype(jnp.complex64), x, False, key, False)[
+            1
+        ].sum()
+
+    grad = jax.grad(objective)(jnp.ones((2, 6)))
+    assert np.isfinite(grad).all()
+    assert np.linalg.norm(grad) > 0
+
+
+def test_default_ib_preset_and_explicit_overrides():
+    from popgym_arcade.experiments.memory_bias import build_parser
+    from popgym_arcade.experiments.memory_models import (
+        DEFAULT_IB_VARIANT,
+        KL_BALANCES,
+        resolve_memory_options,
+    )
+
+    parser = build_parser()
+    args = parser.parse_args([])
+    assert DEFAULT_IB_VARIANT == "ib_reverse_prior20"
+    assert args.variants == [
+        "mlp",
+        "lru",
+        "weight_decay",
+        "state_dropout",
+        DEFAULT_IB_VARIANT,
+    ]
+    assert IB_DIVERGENCES[DEFAULT_IB_VARIANT] == "reverse_kl"
+    assert KL_BALANCES[DEFAULT_IB_VARIANT] == 0.2
+    assert resolve_memory_options(
+        DEFAULT_IB_VARIANT, args.posterior_input, args.lru_residual
+    ) == ("output", True)
+    assert resolve_memory_options("lru", args.posterior_input, args.lru_residual) == (
+        "state",
+        False,
+    )
+    branch = make_branch(DEFAULT_IB_VARIANT)
+    assert branch.posterior.in_features == 518 + branch.hidden
+    assert branch.posterior_input == "output" and branch.residual is True
+    assert make_branch("lru").residual is False
+    explicit = parser.parse_args(
+        [
+            "--variants",
+            "information_bottleneck",
+            "--posterior-input",
+            "state",
+            "--no-lru-residual",
+            "--ib-normalization",
+            "none",
+        ]
+    )
+    assert explicit.variants == ["information_bottleneck"]
+    assert resolve_memory_options(
+        explicit.variants[0], explicit.posterior_input, explicit.lru_residual
+    ) == ("state", False)
+    assert explicit.ib_normalization == "none"
+
+
+def test_default_ib_auto_calibration_is_frozen_and_configuration_specific(
+    tmp_path, monkeypatch
+):
+    import json
+    from types import SimpleNamespace
+
+    from popgym_arcade.experiments import calibrate_divergences
+    from popgym_arcade.experiments.memory_bias import prepare_ib_calibration
+    from popgym_arcade.experiments.memory_models import DEFAULT_IB_VARIANT
+
+    config = {
+        "ENV_NAME": "CartPoleHard",
+        "PARTIAL": True,
+        "OBS_SIZE": 128,
+        "NUM_ENVS": 2,
+        "NUM_STEPS": 3,
+    }
+    args = SimpleNamespace(
+        output=tmp_path, hidden=6, layers=2, rms_calibration=None, ib_normalization=None
+    )
+    calls = []
+
+    def fake_calibrate(env, partial, posterior, seed, output, **kwargs):
+        calls.append(output)
+        payload = {
+            "env": env,
+            "partial_obs": partial,
+            "posterior_input": posterior,
+            "seed": seed,
+            "residual": kwargs["residual"],
+            "hidden": kwargs["hidden"],
+            "layers": kwargs["layers"],
+            "obs_size": kwargs["config"]["OBS_SIZE"],
+            "samples": 6,
+            "scales_bits": {"reverse_kl": [2.0, 3.0]},
+        }
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(payload))
+
+    monkeypatch.setattr(calibrate_divergences, "calibrate", fake_calibrate)
+    first, scales = prepare_ib_calibration(
+        args, DEFAULT_IB_VARIANT, 0, config, "output", True
+    )
+    again, repeated = prepare_ib_calibration(
+        args, DEFAULT_IB_VARIANT, 0, config, "output", True
+    )
+    assert first == again and scales == repeated == [2.0, 3.0]
+    assert len(calls) == 1
+    prepare_ib_calibration(args, DEFAULT_IB_VARIANT, 1, config, "output", True)
+    assert len(calls) == 2 and calls[0] != calls[1]
+    assert prepare_ib_calibration(args, "lru", 0, config, "state", False) == (
+        None,
+        None,
+    )
+    assert prepare_ib_calibration(
+        args, "information_bottleneck", 0, config, "output", True
+    ) == (None, None)
+    args.rms_calibration = calls[0]
+    with pytest.raises(ValueError, match="does not match"):
+        prepare_ib_calibration(args, DEFAULT_IB_VARIANT, 0, config, "state", True)
+    args.ib_normalization = "none"
+    with pytest.raises(ValueError, match="conflicts"):
+        prepare_ib_calibration(args, DEFAULT_IB_VARIANT, 0, config, "output", True)
+    args.rms_calibration = None
+    assert prepare_ib_calibration(
+        args, DEFAULT_IB_VARIANT, 0, config, "output", True
+    ) == (None, None)
+
+
+def test_saved_run_cannot_silently_override_new_ib_defaults():
+    from types import SimpleNamespace
+
+    from popgym_arcade.experiments.memory_bias import validate_saved_settings
+    from popgym_arcade.experiments.memory_models import DEFAULT_IB_VARIANT
+
+    config = {"ENV_NAME": "CartPoleHard", "PARTIAL": False}
+    args = SimpleNamespace(
+        hidden=512,
+        layers=2,
+        timesteps=100000,
+        eval_episodes=64,
+        ib_coefficient=1,
+        ib_normalization=None,
+        rms_calibration=None,
+    )
+    metadata = {
+        "variant": DEFAULT_IB_VARIANT,
+        "seed": 0,
+        "config": config,
+        "hidden": 512,
+        "layers": 2,
+        "requested_steps": 100000,
+        "evaluation_episodes": 64,
+        "posterior_input": "output",
+        "lru_residual": True,
+        "head_inputs": "input_t, posterior_mean, posterior_log_variance",
+        "normalization": "fixed_calibration_rms_excess_above_one_bit",
+        "ib_coefficient": 1,
+    }
+    validate_saved_settings(
+        metadata, args, DEFAULT_IB_VARIANT, 0, config, "output", True
+    )
+    with pytest.raises(ValueError, match="fresh output directory"):
+        validate_saved_settings(
+            metadata | {"normalization": None},
+            args,
+            DEFAULT_IB_VARIANT,
+            0,
+            config,
+            "output",
+            True,
+        )
+    with pytest.raises(ValueError, match="posterior_input"):
+        validate_saved_settings(
+            metadata | {"posterior_input": "state"},
+            args,
+            DEFAULT_IB_VARIANT,
+            0,
+            config,
+            "output",
+            True,
+        )

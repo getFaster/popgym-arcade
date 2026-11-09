@@ -26,11 +26,16 @@ import optax
 
 import popgym_arcade
 from popgym_arcade.experiments.memory_models import (
+    DEFAULT_IB_NORMALIZATION,
+    DEFAULT_IB_VARIANT,
+    DEFAULT_VARIANTS,
     IB_DIVERGENCES,
-    ORIGINAL_VARIANTS,
+    KL_BALANCES,
     VARIANTS,
     MemoryActorCritic,
     free_bit,
+    normalized_excess,
+    resolve_memory_options,
 )
 from popgym_arcade.train import get_args
 from popgym_arcade.wrappers import LogWrapper
@@ -90,7 +95,7 @@ def advantages_and_targets(batch, last_value, gamma, gae_lambda):
     return advantages, advantages + batch.value
 
 
-def build_update(env, params, config, tx, ib_coefficient):
+def build_update(env, params, config, tx, ib_coefficient, rms_scales=None):
     n, steps = config["NUM_ENVS"], config["NUM_STEPS"]
     minibatches = config["NUM_MINIBATCHES"]
     assert n % minibatches == 0, "Recurrent minibatches must contain whole sequences"
@@ -173,7 +178,14 @@ def build_update(env, params, config, tx, ib_coefficient):
                 -(jax.nn.softmax(logits) * jax.nn.log_softmax(logits)).sum(-1).mean()
             )
             ib = (
-                free_bit(kl[0]).mean() + free_bit(kl[1]).mean()
+                (
+                    (free_bit(kl[0]).mean() + free_bit(kl[1]).mean())
+                    if rms_scales is None
+                    else (
+                        normalized_excess(kl[0], rms_scales[0]).mean()
+                        + normalized_excess(kl[1], rms_scales[1]).mean()
+                    )
+                )
                 if model.actor.variant in IB_DIVERGENCES
                 else jnp.array(0.0)
             )
@@ -399,19 +411,140 @@ def write_summary(output):
             "",
             "A short pilot with one seed cannot establish a regularization benefit. Full-budget, multiple-seed runs are needed.",
             "",
-            "IB uses prior mean/log variance at both heads, with no direct recurrent-state path. Its score is therefore an auxiliary-memory training control, not a memory-dependent policy.",
+            "IB heads use current input and posterior mean/log variance, providing a recurrent-state path without sampling.",
         ]
         (output / "RESULTS.md").write_text("\n".join(lines) + "\n")
     return rows
 
 
+def prepare_ib_calibration(args, variant, seed, config, posterior_input, residual):
+    """Resolve the default preset's frozen calibration before allocating training state."""
+    if variant not in IB_DIVERGENCES:
+        return None, None
+    path = getattr(args, "rms_calibration", None)
+    normalization = getattr(args, "ib_normalization", None)
+    if normalization == "none":
+        if path is not None:
+            raise ValueError("--ib-normalization none conflicts with --rms-calibration")
+        return None, None
+    if path is None and normalization is None and variant != DEFAULT_IB_VARIANT:
+        return None, None
+    if path is None:
+        from popgym_arcade.experiments.calibrate_divergences import calibrate
+
+        identity = {
+            "env": config["ENV_NAME"],
+            "partial": config["PARTIAL"],
+            "posterior_input": posterior_input,
+            "residual": residual,
+            "hidden": args.hidden,
+            "layers": args.layers,
+            "seed": seed,
+            "obs_size": config["OBS_SIZE"],
+            "num_envs": config["NUM_ENVS"],
+            "num_steps": config["NUM_STEPS"],
+        }
+        digest = hashlib.sha256(
+            json.dumps(identity, sort_keys=True).encode()
+        ).hexdigest()[:16]
+        path = (
+            args.output
+            / "_calibration"
+            / f"{config['ENV_NAME']}_seed{seed}_{digest}.json"
+        )
+        if not path.exists():
+            calibrate(
+                config["ENV_NAME"],
+                config["PARTIAL"],
+                posterior_input,
+                seed,
+                path,
+                hidden=args.hidden,
+                layers=args.layers,
+                residual=residual,
+                config=config,
+            )
+            jax.clear_caches()
+    calibration = json.loads(Path(path).read_text())
+    expected = {
+        "env": config["ENV_NAME"],
+        "partial_obs": config["PARTIAL"],
+        "posterior_input": posterior_input,
+        "seed": seed,
+        "residual": residual,
+        "hidden": args.hidden,
+        "layers": args.layers,
+        "samples": config["NUM_ENVS"] * config["NUM_STEPS"],
+    }
+    if (
+        any(calibration.get(key) != value for key, value in expected.items())
+        or calibration.get("obs_size", 128) != config["OBS_SIZE"]
+    ):
+        raise ValueError(f"RMS calibration does not match run: {path}")
+    scales = calibration["scales_bits"][IB_DIVERGENCES[variant]]
+    if np.shape(scales) != (2,) or not np.isfinite(scales).all() or min(scales) <= 0:
+        raise ValueError("Invalid RMS scales")
+    return calibration, scales
+
+
+def validate_saved_settings(
+    metadata, args, variant, seed, config, posterior_input, residual
+):
+    """Do not reuse a same-named run made with different preset settings."""
+    expected = {
+        "variant": variant,
+        "seed": seed,
+        "config": config,
+        "hidden": args.hidden,
+        "layers": args.layers,
+        "requested_steps": args.timesteps,
+        "evaluation_episodes": args.eval_episodes,
+        "posterior_input": posterior_input,
+        "lru_residual": residual,
+    }
+    if variant in IB_DIVERGENCES:
+        expected["head_inputs"] = "input_t, posterior_mean, posterior_log_variance"
+        normalization = getattr(args, "ib_normalization", None)
+        uses_rms = normalization != "none" and (
+            getattr(args, "rms_calibration", None) is not None
+            or normalization == DEFAULT_IB_NORMALIZATION
+            or variant == DEFAULT_IB_VARIANT
+        )
+        expected["normalization"] = (
+            "fixed_calibration_rms_excess_above_one_bit" if uses_rms else None
+        )
+        expected["ib_coefficient"] = args.ib_coefficient
+    mismatched = [key for key, value in expected.items() if metadata.get(key) != value]
+    if mismatched:
+        raise ValueError(
+            f"Saved run differs in {', '.join(mismatched)}; use a fresh output directory"
+        )
+
+
 def run_one(args, variant, seed, config):
     directory = args.output / f"{variant}_seed{seed}"
     directory.mkdir(parents=True, exist_ok=True)
+    posterior_input, residual = resolve_memory_options(
+        variant,
+        getattr(args, "posterior_input", None),
+        getattr(args, "lru_residual", None),
+    )
     if (directory / "result.json").exists():
+        validate_saved_settings(
+            json.loads((directory / "result.json").read_text()),
+            args,
+            variant,
+            seed,
+            config,
+            posterior_input,
+            residual,
+        )
         print(f"Skipping completed {directory}", flush=True)
         return
     started = time.monotonic()
+    calibration, rms_scales = prepare_ib_calibration(
+        args, variant, seed, config, posterior_input, residual
+    )
     network = MemoryActorCritic(
         variant,
         jax.random.PRNGKey(seed),
@@ -419,9 +552,11 @@ def run_one(args, variant, seed, config):
         layers=args.layers,
         dropout=args.dropout,
         obs_size=config["OBS_SIZE"],
+        posterior_input=posterior_input,
+        residual=residual,
     )
     env, params = popgym_arcade.make(
-        config["ENV_NAME"], partial_obs=False, obs_size=config["OBS_SIZE"]
+        config["ENV_NAME"], partial_obs=config["PARTIAL"], obs_size=config["OBS_SIZE"]
     )
     env = LogWrapper(env)
     n, steps = config["NUM_ENVS"], config["NUM_STEPS"]
@@ -429,6 +564,9 @@ def run_one(args, variant, seed, config):
     if checkpoint.exists() and (directory / "config.json").exists():
         # Training finished before checkpoint creation; recover only evaluation.
         metadata = json.loads((directory / "config.json").read_text())
+        validate_saved_settings(
+            metadata, args, variant, seed, config, posterior_input, residual
+        )
         records = [
             json.loads(line)
             for line in (directory / "training.jsonl").read_text().splitlines()
@@ -500,6 +638,18 @@ def run_one(args, variant, seed, config):
         rng,
     )
     metadata = {
+        "head_inputs": (
+            "input_t, posterior_mean, posterior_log_variance"
+            if variant in IB_DIVERGENCES
+            else "input_t"
+            if variant == "mlp"
+            else "input_t, projected_lru_output"
+        ),
+        "normalization": "fixed_calibration_rms_excess_above_one_bit"
+        if calibration
+        else None,
+        "rms_calibration": calibration,
+        "rms_scales_bits": rms_scales,
         "variant": variant,
         "seed": seed,
         "upstream_commit": "d061b611718ae55d095791b4ea7046b5266cafd4",
@@ -512,6 +662,10 @@ def run_one(args, variant, seed, config):
         "ib_kl_units": "bits" if variant != "ib_renyi_half" else None,
         "ib_divergence_units": "bits",
         "divergence": IB_DIVERGENCES.get(variant),
+        "kl_prior_gradient_weight": 2 * KL_BALANCES.get(variant, 0.5),
+        "kl_posterior_gradient_weight": 2 * (1 - KL_BALANCES.get(variant, 0.5)),
+        "posterior_input": posterior_input,
+        "lru_residual": residual,
         "ib_free_bits": 1,
         "ib_distribution": "diagonal multivariate normal",
         "hidden": args.hidden,
@@ -535,7 +689,7 @@ def run_one(args, variant, seed, config):
         "evaluation_episodes": args.eval_episodes,
     }
     (directory / "config.json").write_text(json.dumps(metadata, indent=2))
-    update = build_update(env, params, config, tx, args.ib_coefficient)
+    update = build_update(env, params, config, tx, args.ib_coefficient, rms_scales)
     print(
         f"START {variant} seed={seed} updates={num_updates} device={jax.devices()[0]}",
         flush=True,
@@ -559,7 +713,10 @@ def run_one(args, variant, seed, config):
                 "policy_loss": float(metrics[1]),
                 "value_loss": float(metrics[2]),
                 "entropy": float(metrics[3]),
-                "ib_loss_bits": float(metrics[4]),
+                "ib_loss_bits": float(metrics[4]) if rms_scales is None else None,
+                "ib_loss_normalized": float(metrics[4])
+                if rms_scales is not None
+                else None,
                 "actor_divergence_nats": float(metrics[5]),
                 "critic_divergence_nats": float(metrics[6]),
                 "episodes": completed,
@@ -593,16 +750,36 @@ def run_one(args, variant, seed, config):
     jax.clear_caches()
 
 
-def main():
-    defaults = upstream_config()
+def build_parser(defaults=None):
+    defaults = upstream_config() if defaults is None else defaults
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--timesteps", type=int, default=int(defaults["TOTAL_TIMESTEPS"])
     )
     parser.add_argument("--seeds", type=int, nargs="+", default=[0])
     parser.add_argument(
-        "--variants", choices=VARIANTS, nargs="+", default=list(ORIGINAL_VARIANTS)
+        "--variants", choices=VARIANTS, nargs="+", default=list(DEFAULT_VARIANTS)
     )
+    parser.add_argument(
+        "--posterior-input",
+        choices=["state", "output"],
+        default=None,
+        help="IB default: output; explicit state selects the full recurrent state",
+    )
+    parser.add_argument(
+        "--lru-residual",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="IB default: enabled; vanilla controls default: disabled",
+    )
+    parser.add_argument(
+        "--ib-normalization",
+        choices=[DEFAULT_IB_NORMALIZATION, "none"],
+        default=None,
+        help="Default IB preset: fixed_rms with automatic calibration; other variants: none",
+    )
+    parser.add_argument("--rms-calibration", type=Path)
+    parser.add_argument("--partial-obs", action="store_true")
     parser.add_argument("--env", default=defaults["ENV_NAME"])
     parser.add_argument("--hidden", type=int, default=512)
     parser.add_argument("--layers", type=int, default=2)
@@ -611,7 +788,15 @@ def main():
     parser.add_argument("--ib-coefficient", type=float, default=1.0)
     parser.add_argument("--eval-episodes", type=int, default=64)
     parser.add_argument("--output", type=Path, default=Path("results/memory_bias"))
+    return parser
+
+
+def main():
+    defaults = upstream_config()
+    parser = build_parser(defaults)
     args = parser.parse_args()
+    if args.ib_normalization == "none" and args.rms_calibration is not None:
+        parser.error("--ib-normalization none conflicts with --rms-calibration")
     if not 0 <= args.dropout < 1:
         parser.error("--dropout must be in [0, 1)")
     if (
@@ -627,7 +812,7 @@ def main():
         raise RuntimeError("This experiment requires a CUDA GPU")
     config = defaults | {
         "ENV_NAME": args.env,
-        "PARTIAL": False,
+        "PARTIAL": args.partial_obs,
         "TOTAL_TIMESTEPS": args.timesteps,
         "WANDB_MODE": "disabled",
     }

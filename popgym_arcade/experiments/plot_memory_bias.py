@@ -10,6 +10,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from popgym_arcade.experiments.memory_models import DEFAULT_IB_VARIANT
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -19,7 +21,12 @@ def main():
     if not files:
         parser.error("No completed result.json files")
     results = [json.loads(path.read_text()) for path in files]
-    order = ["mlp", "lru", "weight_decay", "state_dropout", "information_bottleneck"]
+    ib_variant = (
+        DEFAULT_IB_VARIANT
+        if any(r["variant"] == DEFAULT_IB_VARIANT for r in results)
+        else "information_bottleneck"
+    )
+    order = ["mlp", "lru", "weight_decay", "state_dropout", ib_variant]
     labels = [
         "MLP reference",
         "LRU",

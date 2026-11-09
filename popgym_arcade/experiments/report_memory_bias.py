@@ -6,12 +6,19 @@ from pathlib import Path
 
 import numpy as np
 
+from popgym_arcade.experiments.memory_models import DEFAULT_IB_VARIANT
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
-    variants = ["mlp", "lru", "weight_decay", "state_dropout", "information_bottleneck"]
+    ib_variant = (
+        DEFAULT_IB_VARIANT
+        if list(args.output.glob(f"{DEFAULT_IB_VARIANT}_seed*/result.json"))
+        else "information_bottleneck"
+    )
+    variants = ["mlp", "lru", "weight_decay", "state_dropout", ib_variant]
     labels = [
         "MLP reference",
         "LRU baseline",
@@ -46,12 +53,17 @@ def main():
         results["lru"]["evaluation_mean"],
     )
     base_bias = reference - baseline
-    ib_bias = reference - results["information_bottleneck"]["evaluation_mean"]
-    improvement = 100 * (base_bias - ib_bias) / base_bias
+    ib_bias = reference - results[ib_variant]["evaluation_mean"]
+    improvement = (
+        100 * (base_bias - ib_bias) / base_bias
+        if abs(base_bias) > 1e-12
+        else float("nan")
+    )
+    ib = results[ib_variant]
     lines = [
         "# Memory-bias pilot results",
         "",
-        f"Completed on CUDA ({results['lru']['device_kind']}), JAX {results['lru']['jax_version']}. Environment: fully observed `{results['lru']['config']['ENV_NAME']}`. Each condition used training seed 0, {results['lru']['actual_steps']:,} environment steps, and {results['lru']['evaluation_episodes']} held-out evaluation episodes. The approved 100K budget was rounded down to complete 2,048-step PPO rollouts.",
+        f"Completed on CUDA ({results['lru']['device_kind']}), JAX {results['lru']['jax_version']}. Environment ({'partially observed' if results['lru']['config']['PARTIAL'] else 'fully observed'}): `{results['lru']['config']['ENV_NAME']}`. Each condition used training seed 0, {results['lru']['actual_steps']:,} environment steps, and {results['lru']['evaluation_episodes']} held-out evaluation episodes. The approved 100K budget was rounded down to complete 2,048-step PPO rollouts.",
         "",
         "`memory bias = MLP reference score − condition score`. Positive bias means the reference outperformed that condition. Positive bias reduction below means an improvement over unregularized LRU.",
         "",
@@ -68,15 +80,15 @@ def main():
         )
     lines += [
         "",
-        f"Information bottleneck reduced the observed gap by **{improvement:.1f}%** relative to the LRU baseline. Weight decay and state dropout did not reduce the gap in this pilot.",
+        f"The selected IB condition `{ib_variant}` changed the observed gap by **{improvement:.1f}%** relative to the LRU baseline (positive means a reduction).",
         "",
         "These are single-training-seed pilot results at roughly 1% of the upstream training budget. Episode-level standard errors do not measure variation across training seeds. The results do not establish statistical significance or a general regularization benefit. The conditions also differ in parameter count, especially IB; there is no parameter-matched control.",
         "",
         "All agents use `(a_{t-1}, r_{t-1}, o_t)`, including at rollout, PPO replay, bootstrap, and evaluation. All PPO settings were read from upstream `train.py`; the training budget and disabled external logging are the explicit overrides.",
         "",
-        "IB uses a diagonal multivariate Gaussian with 1,365 latent coordinates per actor/critic branch, computed as `floor(2/3 × 2,048)` real scalar LRU-state dimensions. Both RL heads receive `(input, prior_mean, prior_log_variance)` directly. The posterior receives `(input, LRU_state)`. KL is `KL(prior || posterior)` in bits; `max(1, KL_bits)` is applied per full distribution and per sample, separately for actor and critic, then summed with coefficient 1. The LRU has no direct inference path to the IB heads, so this variant evaluates auxiliary-memory training rather than a memory-dependent policy.",
+        f"IB condition: `{ib_variant}`. Head inputs: `{ib.get('head_inputs', 'historical prior statistics; superseded IB implementation')}`. Posterior input: `{ib.get('posterior_input', 'state')}`; added residuals: `{ib.get('lru_residual', False)}`. Divergence: `{ib.get('divergence', 'forward_kl')}`. Prior/posterior gradient weights: `{ib.get('kl_prior_gradient_weight', 1.0)}/{ib.get('kl_posterior_gradient_weight', 1.0)}`. Normalization: `{ib.get('normalization')}`. Calibration and raw units are recorded in each run's metadata. The one-bit free region applies to the full Gaussian event, separately for actor and critic.",
         "",
-        "Validation: 12 CPU test cases passed, covering input ordering, resets, KL direction, free-bit units/gradients, dropout replay, GAE termination, complex-parameter gradients, and two-layer parallel/serial equivalence for LRU, dropout, and IB. A full-size CUDA check also passed, with maximum absolute logit difference below 5e-7. Ruff formatting and lint passed for the experiment code and checks.",
+        "This report rechecked episode-return statistics, complete training steps, and finite training losses against the saved artifacts. Development test results are recorded separately from these experimental scores.",
         "",
         "![Evaluation and learning curves](comparison.png)",
         "",

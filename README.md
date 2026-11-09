@@ -102,3 +102,12 @@ If you use POPGym Arcade in your work, please cite it as follows:
   year={2025}
 }
 ```
+
+
+### Default information bottleneck experiment
+
+The provisional IB preset is **reverse KL + output posterior input + prior20**
+(`ib_reverse_prior20`), with residual connections and frozen RMS normalization.
+Actor and critic consume current input plus posterior statistics. See
+[the current preset and run command](MEMORY_BIAS.md#current-default-ib-preset)
+for automatic calibration, explicit overrides, and experiment limitations.
