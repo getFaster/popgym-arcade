@@ -1,0 +1,17 @@
+{
+  "worker": "local",
+  "tasks": [
+    "NavigatorEasy",
+    "CartPoleHard"
+  ],
+  "variant": "lru",
+  "partial_obs": true,
+  "lru_residual": false,
+  "head_inputs": "input_t, projected_lru_output",
+  "seed": 0,
+  "requested_steps": 100000,
+  "actual_steps": 98304,
+  "evaluation_episodes": 64,
+  "ib_coefficient": 0,
+  "rms_calibration": null
+}

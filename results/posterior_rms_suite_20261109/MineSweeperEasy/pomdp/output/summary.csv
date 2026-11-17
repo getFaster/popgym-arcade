@@ -1,0 +1,9 @@
+variant,seeds,steps_per_seed,score_mean,score_seed_std,memory_bias
+ib_forward_prior20,1,98304,0.2982701063156128,,
+ib_forward_prior80,1,98304,0.2712053656578064,,
+ib_reverse_prior20,1,98304,0.3529576063156128,,
+ib_reverse_prior80,1,98304,0.2929687798023224,,
+ib_symmetric_prior20,1,98304,0.3219866156578064,,
+ib_symmetric_prior80,1,98304,0.330078125,,
+ib_renyi_half_prior20,1,98304,0.2633928656578064,,
+ib_renyi_half_prior80,1,98304,0.3083147406578064,,

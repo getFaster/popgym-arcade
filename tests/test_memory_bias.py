@@ -71,7 +71,9 @@ def test_reset_and_replay(variant):
     reset = branch.step(state, x, True, key, True)
     fresh = branch.step(jnp.zeros_like(state), x, False, key, True)
     replay = branch.step(state, x, True, key, True)
-    for actual, expected, repeated in zip(reset, fresh, replay):
+    for actual, expected, repeated in zip(
+        jax.tree.leaves(reset), jax.tree.leaves(fresh), jax.tree.leaves(replay)
+    ):
         np.testing.assert_array_equal(actual, expected)
         np.testing.assert_array_equal(actual, repeated)
 
@@ -248,7 +250,11 @@ def test_task_specific_evaluation_horizons():
 
 
 def test_ib_divergences_share_initial_parameters():
-    branches = [make_branch(variant) for variant in IB_DIVERGENCES]
+    branches = [
+        make_branch(variant)
+        for variant in IB_DIVERGENCES
+        if not variant.endswith("_prediction")
+    ]
     reference = jax.tree.leaves(eqx.filter(branches[0], eqx.is_array))
     for branch in branches[1:]:
         leaves = jax.tree.leaves(eqx.filter(branch, eqx.is_array))
@@ -543,6 +549,16 @@ def test_saved_run_cannot_silently_override_new_ib_defaults():
     validate_saved_settings(
         metadata, args, DEFAULT_IB_VARIANT, 0, config, "output", True
     )
+    with pytest.raises(ValueError, match="learning_rate_schedule_steps"):
+        validate_saved_settings(
+            metadata | {"learning_rate_schedule_steps": 200000},
+            args,
+            DEFAULT_IB_VARIANT,
+            0,
+            config,
+            "output",
+            True,
+        )
     with pytest.raises(ValueError, match="fresh output directory"):
         validate_saved_settings(
             metadata | {"normalization": None},

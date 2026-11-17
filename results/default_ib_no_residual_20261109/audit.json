@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "completed": 8,
+  "expected": 8,
+  "evaluation_episodes": 512,
+  "no_residual_lru_minus_se_passes": 3,
+  "residual_lru_minus_se_passes": 6,
+  "no_residual_higher_than_residual": 2,
+  "all_calibration_trajectories_match": true,
+  "checked": [
+    "eight unique expected task/mode cells",
+    "local GPU",
+    "snapshot source hashes",
+    "48 finite PPO updates per run",
+    "64 episode returns and recalculated statistics per condition",
+    "checkpoints",
+    "matched reference configurations",
+    "residual flags and frozen RMS calibration"
+  ]
+}

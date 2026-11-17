@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "completed_runs": 128,
+  "expected_runs": 128,
+  "evaluation_episodes_total": 8192,
+  "training_steps_total": 12582912,
+  "errors": [],
+  "source_hashes": [
+    {
+      "memory_bias.py": "72ca9be43ed2786c8036c372f32d6771d5690ce79bc0811d2980ea506f94fbd0",
+      "memory_models.py": "f932038296863684f1149a5b79e5b487805a80a30e44563e658004d62b308422",
+      "uv.lock": "b69e580fd829cad42f78b217800db80138de4fbf72728bc61d2d3b68e65a46a7"
+    }
+  ],
+  "checked": [
+    "complete unique factorial matrix",
+    "posterior head metadata",
+    "residual and normalization settings",
+    "identical training source/lock hashes and PPO settings",
+    "48 finite PPO updates per run",
+    "64 finite evaluation returns and recalculated statistics per run",
+    "checkpoint presence",
+    "shared frozen calibration across divergence/balancing choices"
+  ]
+}

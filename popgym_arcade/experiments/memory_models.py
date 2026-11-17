@@ -56,8 +56,13 @@ IB_DIVERGENCES.update(
         for name in KL_BALANCES
     }
 )
-VARIANTS = ORIGINAL_VARIANTS + tuple(
-    k for k in IB_DIVERGENCES if k not in ORIGINAL_VARIANTS
+IB_DIVERGENCES["ib_reverse_prior20_prediction"] = "reverse_kl"
+KL_BALANCES["ib_reverse_prior20_prediction"] = 0.2
+
+VARIANTS = (
+    ORIGINAL_VARIANTS
+    + ("lru_prediction", "mlp_prediction")
+    + tuple(k for k in IB_DIVERGENCES if k not in ORIGINAL_VARIANTS)
 )
 
 
@@ -119,6 +124,23 @@ def make_input(embedding, previous_action, previous_reward, done):
     return jnp.concatenate((action, reward, embedding), axis=-1)
 
 
+def fsq(x, levels=5, scale=1.0):
+    """Fixed scalar levels, with identity rounding gradient and tanh derivative."""
+    import math
+
+    if not isinstance(levels, int) or levels < 3 or levels % 2 == 0:
+        raise ValueError("fsq_levels must be an odd integer >= 3")
+    if not math.isfinite(scale) or scale <= 0:
+        raise ValueError("fsq_scale must be finite and positive")
+    if jnp.iscomplexobj(x):
+        return (fsq(x.real, levels, scale) + 1j * fsq(x.imag, levels, scale)).astype(
+            x.dtype
+        )
+    m = levels // 2
+    u = m * jnp.tanh(x / scale)
+    return ((u + jax.lax.stop_gradient(jnp.round(u) - u)) / m).astype(x.dtype)
+
+
 class LRUCell(eqx.Module):
     """Stable diagonal complex LRU, with real-valued trainable parameters."""
 
@@ -131,7 +153,17 @@ class LRUCell(eqx.Module):
     c_imag: jax.Array
     skip: jax.Array
 
-    def __init__(self, input_size, hidden_size, key):
+    quantization: str = eqx.field(static=True)
+    levels: int = eqx.field(static=True)
+    scale: float = eqx.field(static=True)
+
+    def __init__(
+        self, input_size, hidden_size, key, quantization="none", levels=5, scale=1.0
+    ):
+        if quantization not in ("none", "fsq", "output"):
+            raise ValueError("quantization must be none, fsq, or output")
+        fsq(jnp.zeros(()), levels, scale)
+        self.quantization, self.levels, self.scale = quantization, levels, scale
         keys = jax.random.split(key, 7)
         radius = jax.random.uniform(keys[0], (hidden_size,), minval=0.0, maxval=0.99)
         self.nu = jnp.log(-jnp.log(jnp.maximum(radius, 1e-4)))
@@ -159,13 +191,21 @@ class LRUCell(eqx.Module):
         eigenvalue = jnp.exp(-jnp.exp(self.nu) + 1j * jnp.exp(self.theta))
         b = jnp.exp(self.gamma)[:, None] * (self.b_real + 1j * self.b_imag)
         state = eigenvalue * (state * mask) + b @ x
-        output = jnp.real((self.c_real + 1j * self.c_imag) @ state) + self.skip @ x
+        if self.quantization == "fsq":
+            state = fsq(state, self.levels, self.scale)
+        readout = (
+            fsq(state, self.levels, self.scale)
+            if self.quantization == "output"
+            else state
+        )
+        output = jnp.real((self.c_real + 1j * self.c_imag) @ readout) + self.skip @ x
         return state, jax.nn.leaky_relu(output)
 
 
 class Branch(eqx.Module):
     cnn: nn.Sequential
     cells: tuple
+    prediction: nn.Linear | None
     memory_projection: nn.Linear | None
     prior: nn.Linear | None
     posterior: nn.Linear | None
@@ -189,6 +229,9 @@ class Branch(eqx.Module):
         key,
         posterior_input=None,
         residual=None,
+        recurrent_state_quantization="none",
+        fsq_levels=5,
+        fsq_scale=1.0,
     ):
         posterior_input, residual = resolve_memory_options(
             variant, posterior_input, residual
@@ -202,16 +245,34 @@ class Branch(eqx.Module):
         self.latent_dim = (2 * hidden * layers * 2) // 3
         self.cells = (
             tuple(
-                LRUCell(518 if i == 0 else hidden, hidden, keys[i])
+                LRUCell(
+                    518 if i == 0 else hidden,
+                    hidden,
+                    keys[i],
+                    recurrent_state_quantization,
+                    fsq_levels,
+                    fsq_scale,
+                )
                 for i in range(layers)
             )
-            if variant != "mlp"
+            if variant.removesuffix("_prediction") != "mlp"
             else ()
         )
         is_ib = variant in IB_DIVERGENCES
         self.memory_projection = (
             nn.Linear(hidden, 256, key=keys[-5])
-            if variant != "mlp" and not is_ib
+            if variant.removesuffix("_prediction") != "mlp" and not is_ib
+            else None
+        )
+        self.prediction = (
+            nn.Linear(
+                256
+                if variant == "mlp_prediction"
+                else 518 + (2 * self.latent_dim if is_ib else hidden),
+                5 * 513,
+                key=jax.random.fold_in(key, 987),
+            )
+            if variant.endswith("_prediction")
             else None
         )
         self.prior = (
@@ -227,7 +288,11 @@ class Branch(eqx.Module):
             else None
         )
         head_size = 518 + (
-            2 * self.latent_dim if is_ib else 256 if variant != "mlp" else 0
+            2 * self.latent_dim
+            if is_ib
+            else 256
+            if variant.removesuffix("_prediction") != "mlp"
+            else 0
         )
         self.head = nn.Sequential(
             [
@@ -247,8 +312,13 @@ class Branch(eqx.Module):
 
     def step(self, state, x, done, key, training):
         state = jnp.where(done, jnp.zeros_like(state), state)
-        if self.variant == "mlp":
-            return state, self.head(x), jnp.array(0.0)
+        if self.variant.removesuffix("_prediction") == "mlp":
+            aux = jnp.array(0.0)
+            if self.prediction is not None:
+                # Share the PPO MLP trunk; detach only its CNN input in auxiliary replay.
+                hidden = nn.Sequential(self.head.layers[:-1])(x)
+                aux = (aux, self.prediction(hidden).reshape(5, 513))
+            return state, self.head(x), aux
         masks = jnp.ones(state.shape, dtype=jnp.float32)
         if self.variant == "state_dropout" and training:
             # Drop the carried state, sharing each mask across its real/imag parts.
@@ -286,10 +356,49 @@ class Branch(eqx.Module):
             features = jnp.concatenate((x, qm, ql))
         else:
             features = jnp.concatenate((x, self.memory_projection(y)))
+        if self.prediction is not None:
+            kl = (
+                kl,
+                self.prediction(
+                    features
+                    if self.variant in IB_DIVERGENCES
+                    else jnp.concatenate((x, y))
+                ).reshape(5, 513),
+            )
         return state, self.head(features), kl
+
+    def quantization_trace(self, state, x, done):
+        """Pre-quantization updates and previous readout codes for diagnostics."""
+        state = jnp.where(done, jnp.zeros_like(state), state)
+        raw, previous = [], []
+        y = x
+        for i, cell in enumerate(self.cells):
+            eigenvalue = jnp.exp(-jnp.exp(cell.nu) + 1j * jnp.exp(cell.theta))
+            b = jnp.exp(cell.gamma)[:, None] * (cell.b_real + 1j * cell.b_imag)
+            raw.append(eigenvalue * state[i] + b @ y)
+            previous.append(
+                state[i]
+                if cell.quantization == "fsq"
+                else fsq(state[i], cell.levels, cell.scale)
+            )
+            old_y = y
+            _, y = cell(state[i], y, jnp.ones_like(state[i].real))
+            if self.residual and i > 0:
+                y = y + old_y
+        return jnp.stack(raw), jnp.stack(previous)
 
     def parallel_sequence(self, initial_state, inputs, done, keys, training):
         """Associative affine scan: same recurrence and reset/dropout masks as step."""
+        if self.cells[0].quantization == "fsq":
+
+            def body(state, xs):
+                state, output, aux = self.step(state, *xs, training)
+                return state, (output, aux)
+
+            state, (output, aux) = jax.lax.scan(
+                body, initial_state, (inputs, done, keys)
+            )
+            return state, output, aux
         masks = jnp.ones((inputs.shape[0], self.layers, self.hidden))
         if self.variant == "state_dropout" and training:
             masks = jax.vmap(
@@ -313,7 +422,12 @@ class Branch(eqx.Module):
             factors, offsets = jax.lax.associative_scan(compose, (factors, drives))
             states = factors * initial_state[i] + offsets
             c = cell.c_real + 1j * cell.c_imag
-            y = jax.nn.leaky_relu(jnp.real(states @ c.T) + y @ cell.skip.T)
+            readout = (
+                fsq(states, cell.levels, cell.scale)
+                if cell.quantization == "output"
+                else states
+            )
+            y = jax.nn.leaky_relu(jnp.real(readout @ c.T) + y @ cell.skip.T)
             if self.residual and i > 0:
                 y = y + previous
             layer_states.append(states)
@@ -352,6 +466,15 @@ class Branch(eqx.Module):
             features = jnp.concatenate(
                 (inputs, jax.vmap(self.memory_projection)(y)), axis=-1
             )
+        if self.prediction is not None:
+            kl = (
+                kl,
+                jax.vmap(self.prediction)(
+                    features
+                    if self.variant in IB_DIVERGENCES
+                    else jnp.concatenate((inputs, y), axis=-1)
+                ).reshape(inputs.shape[0], 5, 513),
+            )
         return states[-1], jax.vmap(self.head)(features), kl
 
 
@@ -370,7 +493,12 @@ class MemoryActorCritic(eqx.Module):
         obs_size=128,
         posterior_input=None,
         residual=None,
+        recurrent_state_quantization="none",
+        fsq_levels=5,
+        fsq_scale=1.0,
     ):
+        if recurrent_state_quantization != "none" and variant != "lru":
+            raise ValueError("Initial FSQ experiment supports variant lru only")
         cnn_key, actor_key, critic_key = jax.random.split(key, 3)
         upstream = ActorCritic(cnn_key, obs_size)
         self.actor = Branch(
@@ -383,6 +511,9 @@ class MemoryActorCritic(eqx.Module):
             actor_key,
             posterior_input,
             residual,
+            recurrent_state_quantization,
+            fsq_levels,
+            fsq_scale,
         )
         self.critic = Branch(
             upstream.critic_cnn,
@@ -394,6 +525,9 @@ class MemoryActorCritic(eqx.Module):
             critic_key,
             posterior_input,
             residual,
+            recurrent_state_quantization,
+            fsq_levels,
+            fsq_scale,
         )
 
     def initial_state(self, batch_size):
@@ -423,7 +557,17 @@ class MemoryActorCritic(eqx.Module):
             state, self.encode(obs, action, reward, done), done, keys, training
         )
 
-    def sequence(self, state, obs, action, reward, done, keys, training=True):
+    def sequence(
+        self,
+        state,
+        obs,
+        action,
+        reward,
+        done,
+        keys,
+        training=True,
+        detach_encoder=False,
+    ):
         t, b = obs.shape[:2]
         encoded = self.encode(
             obs.reshape((-1,) + obs.shape[2:]),
@@ -431,9 +575,11 @@ class MemoryActorCritic(eqx.Module):
             reward.ravel(),
             done.ravel(),
         )
+        if detach_encoder:
+            encoded = jax.tree.map(jax.lax.stop_gradient, encoded)
         encoded = tuple(x.reshape(t, b, -1) for x in encoded)
 
-        if self.actor.variant != "mlp":
+        if self.actor.variant.removesuffix("_prediction") != "mlp":
             branch_keys = jax.vmap(jax.vmap(lambda key: jax.random.split(key, 2)))(keys)
             a, logits, akl = jax.vmap(
                 lambda s, x, d, k: self.actor.parallel_sequence(s, x, d, k, training),
@@ -460,3 +606,49 @@ def normalized_excess(divergence_nats, scale_bits):
     return jnp.maximum(
         divergence_nats / jnp.log(2.0) - 1.0, 0.0
     ) / jax.lax.stop_gradient(scale_bits)
+
+
+def prediction_losses(predictions, action, next_embedding, reward, next_done):
+    """Selected-action MSE; reset images are excluded, terminal rewards retained."""
+    chosen = jnp.take_along_axis(predictions, action[..., None, None], axis=-2)[
+        ..., 0, :
+    ]
+    error = jnp.mean(
+        (chosen[..., :512] - jax.lax.stop_gradient(next_embedding)) ** 2, -1
+    )
+    valid = ~next_done
+    observation_loss = jnp.where(valid, error, 0.0).sum() / jnp.maximum(valid.sum(), 1)
+    reward_loss = jnp.mean((chosen[..., 512] - reward) ** 2)
+    return observation_loss, reward_loss
+
+
+def fsq_diagnostics(raw, previous, levels=5, scale=1.0, valid=None):
+    """Device-side scalar statistics; leading axes are samples, last is feature.
+
+    Entropy is in nats, averaged per feature. Error is mean squared L2 norm.
+    Call on reset-filtered samples when measuring within-episode dynamics.
+    """
+    quantized = fsq(raw, levels, scale)
+    result = {}
+    components = (("real", raw.real, quantized.real, previous.real),)
+    if jnp.iscomplexobj(raw):
+        components += (("imag", raw.imag, quantized.imag, previous.imag),)
+    for name, x, q, p in components:
+        codes = jnp.round(q * (levels // 2)).astype(jnp.int32) + levels // 2
+        counts = jax.nn.one_hot(codes, levels).reshape(-1, q.shape[-1], levels).sum(0)
+        probs = counts / jnp.maximum(counts.sum(-1, keepdims=True), 1)
+        result.update(
+            {
+                f"{name}_error": jnp.mean(jnp.sum((x - q) ** 2, axis=-1)),
+                f"{name}_saturation": jnp.mean(jnp.abs(q) == 1),
+                f"{name}_utilization": jnp.mean(counts > 0),
+                f"{name}_entropy_nats": -jnp.mean(
+                    jnp.sum(probs * jnp.log(jnp.maximum(probs, 1e-30)), -1)
+                ),
+                f"{name}_change": jnp.mean(q != p)
+                if valid is None
+                else jnp.sum((q != p) * valid)
+                / jnp.maximum(jnp.sum(jnp.broadcast_to(valid, q.shape)), 1),
+            }
+        )
+    return result

@@ -1,0 +1,11 @@
+{
+  "source": "results/lru_prediction_20261111/CartPoleHard/mdp/lru_seed0",
+  "reason": "Identical vanilla LRU architecture, PPO settings, seed, steps and evaluation. Prediction heads absent in this control. Copied byte-for-byte; original source hashes retained.",
+  "sha256": {
+    "training.jsonl": "dad1980ac5e86a48478fbd61629c12be567970b1442bfbee07c56fc84a9bd672",
+    "config.json": "dcea4a393c4716b0563997d73ee133c1c58263602f86837bcee6d666eae45219",
+    "result.json": "b3b7af7a6831f307a17231530aa4610535e616ca24adfcb66dee93e57684d0d3",
+    "model.eqx": "fdac5540b160f4012e8076715697705f74bbd98b611edcc97d65968c97860ac7",
+    "evaluation_returns.npy": "9ce97fb5854d5fcd2a2bcbd82316ee8cf46cf5021f032874ec9edefe7e93987d"
+  }
+}

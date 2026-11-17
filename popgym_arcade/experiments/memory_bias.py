@@ -8,6 +8,7 @@ import csv
 import hashlib
 import json
 import os
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -25,6 +26,12 @@ import numpy as np
 import optax
 
 import popgym_arcade
+from popgym_arcade.experiments.checkpoints import (
+    checkpoint_due,
+    restore_checkpoint,
+    save_checkpoint,
+    trim_training_log,
+)
 from popgym_arcade.experiments.memory_models import (
     DEFAULT_IB_NORMALIZATION,
     DEFAULT_IB_VARIANT,
@@ -34,7 +41,9 @@ from popgym_arcade.experiments.memory_models import (
     VARIANTS,
     MemoryActorCritic,
     free_bit,
+    fsq_diagnostics,
     normalized_excess,
+    prediction_losses,
     resolve_memory_options,
 )
 from popgym_arcade.train import get_args
@@ -53,6 +62,7 @@ class Transition(NamedTuple):
     next_done: jax.Array
     log_prob: jax.Array
     episode_return: jax.Array
+    next_obs: jax.Array = None
 
 
 class Runner(NamedTuple):
@@ -95,7 +105,29 @@ def advantages_and_targets(batch, last_value, gamma, gae_lambda):
     return advantages, advantages + batch.value
 
 
-def build_update(env, params, config, tx, ib_coefficient, rms_scales=None):
+def gradient_norm_metrics(grads, max_norm):
+    raw = optax.global_norm(grads)
+    return jnp.stack(
+        (
+            raw,
+            raw,
+            jnp.minimum(raw, max_norm),
+            optax.global_norm(grads.actor),
+            optax.global_norm(grads.critic),
+        )
+    )
+
+
+def build_update(
+    env,
+    params,
+    config,
+    tx,
+    ib_coefficient,
+    rms_scales=None,
+    log_gradients=False,
+    prediction_coefficient=1.0,
+):
     n, steps = config["NUM_ENVS"], config["NUM_STEPS"]
     minibatches = config["NUM_MINIBATCHES"]
     assert n % minibatches == 0, "Recurrent minibatches must contain whole sequences"
@@ -103,19 +135,26 @@ def build_update(env, params, config, tx, ib_coefficient, rms_scales=None):
     @eqx.filter_jit
     def update(network, opt_state, runner):
         initial_memory = runner.memory
+        quantized = (
+            bool(network.actor.cells) and network.actor.cells[0].quantization != "none"
+        )
 
         def rollout(r, _):
             rng, model_key, action_key, env_key = jax.random.split(r.rng, 4)
             keys = jax.random.split(model_key, n)
-            memory, logits, value, _ = network.step(
-                r.memory,
-                r.obs,
-                r.previous_action,
-                r.previous_reward,
-                r.done,
-                keys,
-                True,
+            encoded = network.encode(
+                r.obs, r.previous_action, r.previous_reward, r.done
             )
+            memory, logits, value, _ = network.step_encoded(
+                r.memory, encoded, r.done, keys, True
+            )
+            if quantized:
+                traces = tuple(
+                    jax.vmap(branch.quantization_trace)(state, x, r.done)
+                    for branch, state, x in zip(
+                        (network.actor, network.critic), r.memory, encoded
+                    )
+                )
             action = jax.random.categorical(action_key, logits).astype(jnp.int32)
             obs, state, reward, done, info = jax.vmap(
                 env.step, in_axes=(0, 0, 0, None)
@@ -132,10 +171,29 @@ def build_update(env, params, config, tx, ib_coefficient, rms_scales=None):
                 done,
                 log_prob(logits, action),
                 info["returned_episode_returns"],
+                obs,
             )
-            return Runner(state, obs, action, reward, done, memory, rng), transition
+            return Runner(state, obs, action, reward, done, memory, rng), (
+                transition,
+                traces,
+            ) if quantized else transition
 
         runner, batch = jax.lax.scan(rollout, runner, None, length=steps)
+        if quantized:
+            batch, traces = batch
+            diagnostics = []
+            cell = network.actor.cells[0]
+            for raw, previous in traces:
+                # Flatten layers/features together; retain rollout time and env axes.
+                shape = raw.shape[:2] + (-1,)
+                stats = fsq_diagnostics(
+                    raw.reshape(shape),
+                    previous.reshape(shape),
+                    cell.levels,
+                    cell.scale,
+                    (~batch.done)[..., None],
+                )
+                diagnostics.extend(stats.values())
         _, _, last_value, _ = network.step(
             runner.memory,
             runner.obs,
@@ -158,6 +216,8 @@ def build_update(env, params, config, tx, ib_coefficient, rms_scales=None):
                 trajectory.done,
                 trajectory.keys,
             )
+            if model.actor.variant.endswith("_prediction"):
+                kl = tuple(k[0] for k in kl)
             ratio = jnp.exp(log_prob(logits, trajectory.action) - trajectory.log_prob)
             advantage = (advantage - advantage.mean()) / (advantage.std() + 1e-8)
             policy_loss = -jnp.minimum(
@@ -189,11 +249,41 @@ def build_update(env, params, config, tx, ib_coefficient, rms_scales=None):
                 if model.actor.variant in IB_DIVERGENCES
                 else jnp.array(0.0)
             )
+            observation_loss, reward_loss = jnp.array(0.0), jnp.array(0.0)
+            if model.actor.variant.endswith("_prediction"):
+                # Separate replay blocks auxiliary gradients at both CNN inputs.
+                _, (_, _, predictions) = model.sequence(
+                    memory,
+                    trajectory.obs,
+                    trajectory.previous_action,
+                    trajectory.previous_reward,
+                    trajectory.done,
+                    trajectory.keys,
+                    detach_encoder=True,
+                )
+                shape = trajectory.next_obs.shape
+                next_encoded = model.encode(
+                    trajectory.next_obs.reshape((-1,) + shape[2:]),
+                    trajectory.action.ravel(),
+                    trajectory.reward.ravel(),
+                    trajectory.next_done.ravel(),
+                )
+                for prediction, encoded in zip(predictions, next_encoded):
+                    ol, rl = prediction_losses(
+                        prediction[1],
+                        trajectory.action,
+                        encoded[..., -512:].reshape(*shape[:2], 512),
+                        trajectory.reward,
+                        trajectory.next_done,
+                    )
+                    observation_loss = observation_loss + ol
+                    reward_loss = reward_loss + rl
             total = (
                 policy_loss
                 + config["VF_COEF"] * value_loss
                 - config["ENT_COEF"] * entropy
                 + ib_coefficient * ib
+                + prediction_coefficient * (observation_loss + reward_loss)
             )
             return total, jnp.stack(
                 (
@@ -204,6 +294,8 @@ def build_update(env, params, config, tx, ib_coefficient, rms_scales=None):
                     ib,
                     jnp.mean(kl[0]),
                     jnp.mean(kl[1]),
+                    observation_loss,
+                    reward_loss,
                 )
             )
 
@@ -234,6 +326,10 @@ def build_update(env, params, config, tx, ib_coefficient, rms_scales=None):
                 (_, metrics), grads = eqx.filter_value_and_grad(loss, has_aux=True)(
                     model, memory, trajectory, advantage, target
                 )
+                if log_gradients:
+                    metrics = jnp.concatenate(
+                        (metrics, gradient_norm_metrics(grads, config["MAX_GRAD_NORM"]))
+                    )
                 changes, optimizer_state = tx.update(
                     grads, optimizer_state, eqx.filter(model, eqx.is_inexact_array)
                 )
@@ -249,7 +345,9 @@ def build_update(env, params, config, tx, ib_coefficient, rms_scales=None):
                 eqx.combine(dynamic_model, static),
                 optimizer_state,
                 rng,
-                metrics.mean(0),
+                metrics.mean(0).at[10].set(metrics[:, 10].max())
+                if log_gradients
+                else metrics.mean(0),
             )
 
         (dynamic, opt_state, rng), metrics = jax.lax.scan(
@@ -262,7 +360,14 @@ def build_update(env, params, config, tx, ib_coefficient, rms_scales=None):
         runner = runner._replace(rng=rng)
         completed = batch.next_done.sum()
         return_sum = jnp.where(batch.next_done, batch.episode_return, 0).sum()
-        return network, opt_state, runner, metrics.mean(0), completed, return_sum
+        averaged = (
+            metrics.mean(0).at[10].set(metrics[:, 10].max())
+            if log_gradients
+            else metrics.mean(0)
+        )
+        if quantized:
+            averaged = jnp.concatenate((averaged, jnp.stack(diagnostics)))
+        return network, opt_state, runner, averaged, completed, return_sum
 
     return update
 
@@ -427,7 +532,11 @@ def prepare_ib_calibration(args, variant, seed, config, posterior_input, residua
         if path is not None:
             raise ValueError("--ib-normalization none conflicts with --rms-calibration")
         return None, None
-    if path is None and normalization is None and variant != DEFAULT_IB_VARIANT:
+    if (
+        path is None
+        and normalization is None
+        and variant.removesuffix("_prediction") != DEFAULT_IB_VARIANT
+    ):
         return None, None
     if path is None:
         from popgym_arcade.experiments.calibrate_divergences import calibrate
@@ -500,21 +609,45 @@ def validate_saved_settings(
         "requested_steps": args.timesteps,
         "evaluation_episodes": args.eval_episodes,
         "posterior_input": posterior_input,
+        "recurrent_state_quantization": getattr(
+            args, "recurrent_state_quantization", "none"
+        ),
+        "fsq_levels": getattr(args, "fsq_levels", 5),
+        "fsq_scale": getattr(args, "fsq_scale", 1.0),
         "lru_residual": residual,
     }
+    schedule_steps = getattr(args, "schedule_timesteps", None)
+    if schedule_steps is not None or "learning_rate_schedule_steps" in metadata:
+        expected["learning_rate_schedule_steps"] = schedule_steps or args.timesteps
+    if variant.endswith("_prediction"):
+        expected["prediction_coefficient"] = getattr(
+            args, "prediction_coefficient", 1.0
+        )
     if variant in IB_DIVERGENCES:
         expected["head_inputs"] = "input_t, posterior_mean, posterior_log_variance"
         normalization = getattr(args, "ib_normalization", None)
         uses_rms = normalization != "none" and (
             getattr(args, "rms_calibration", None) is not None
             or normalization == DEFAULT_IB_NORMALIZATION
-            or variant == DEFAULT_IB_VARIANT
+            or variant.removesuffix("_prediction") == DEFAULT_IB_VARIANT
         )
         expected["normalization"] = (
             "fixed_calibration_rms_excess_above_one_bit" if uses_rms else None
         )
         expected["ib_coefficient"] = args.ib_coefficient
-    mismatched = [key for key, value in expected.items() if metadata.get(key) != value]
+    mismatched = [
+        key
+        for key, value in expected.items()
+        if metadata.get(
+            key,
+            {
+                "recurrent_state_quantization": "none",
+                "fsq_levels": 5,
+                "fsq_scale": 1.0,
+            }.get(key),
+        )
+        != value
+    ]
     if mismatched:
         raise ValueError(
             f"Saved run differs in {', '.join(mismatched)}; use a fresh output directory"
@@ -529,6 +662,20 @@ def run_one(args, variant, seed, config):
         getattr(args, "posterior_input", None),
         getattr(args, "lru_residual", None),
     )
+    external_resume = getattr(args, "resume_from", None)
+    if external_resume is not None and any(directory.iterdir()):
+        saved_config = directory / "config.json"
+        previous = json.loads(saved_config.read_text()) if saved_config.exists() else {}
+        previous_source = previous.get("resume_from")
+        if (
+            previous_source is None
+            or Path(previous_source).resolve() != Path(external_resume).resolve()
+        ):
+            raise ValueError("--resume-from must use a fresh output directory")
+        # Permit retries of this same extension, with the same settings.
+        validate_saved_settings(
+            previous, args, variant, seed, config, posterior_input, residual
+        )
     if (directory / "result.json").exists():
         validate_saved_settings(
             json.loads((directory / "result.json").read_text()),
@@ -542,8 +689,38 @@ def run_one(args, variant, seed, config):
         print(f"Skipping completed {directory}", flush=True)
         return
     started = time.monotonic()
+    source_run = None
+    source_record = None
+    calibration_args = args
+    if external_resume is not None:
+        external_resume = Path(external_resume)
+        candidates = (
+            [external_resume / "checkpoint.json"]
+            if (external_resume / "checkpoint.json").exists()
+            else sorted(
+                (external_resume / "checkpoints").glob("step_*/checkpoint.json")
+            )
+        )
+        if not candidates:
+            raise ValueError(
+                "--resume-from requires a full training checkpoint or run directory"
+            )
+        source_record = json.loads(candidates[-1].read_text())
+        source_run = candidates[-1].parent.parent.parent
+        if source_run.resolve() == directory.resolve():
+            raise ValueError("--resume-from must use a fresh output directory")
+        previous_calibration = source_record["run_metadata"].get("rms_calibration")
+        if (
+            previous_calibration is not None
+            and getattr(args, "rms_calibration", None) is None
+        ):
+            frozen = args.output / "_calibration" / f"resumed_seed{seed}.json"
+            frozen.parent.mkdir(parents=True, exist_ok=True)
+            frozen.write_text(json.dumps(previous_calibration, indent=2) + "\n")
+            calibration_args = argparse.Namespace(**vars(args))
+            calibration_args.rms_calibration = frozen
     calibration, rms_scales = prepare_ib_calibration(
-        args, variant, seed, config, posterior_input, residual
+        calibration_args, variant, seed, config, posterior_input, residual
     )
     network = MemoryActorCritic(
         variant,
@@ -554,6 +731,11 @@ def run_one(args, variant, seed, config):
         obs_size=config["OBS_SIZE"],
         posterior_input=posterior_input,
         residual=residual,
+        recurrent_state_quantization=getattr(
+            args, "recurrent_state_quantization", "none"
+        ),
+        fsq_levels=getattr(args, "fsq_levels", 5),
+        fsq_scale=getattr(args, "fsq_scale", 1.0),
     )
     env, params = popgym_arcade.make(
         config["ENV_NAME"], partial_obs=config["PARTIAL"], obs_size=config["OBS_SIZE"]
@@ -612,10 +794,12 @@ def run_one(args, variant, seed, config):
     num_updates = int(args.timesteps // (n * steps))
     if num_updates < 1:
         raise ValueError("Need at least one rollout of training")
+    schedule_steps = getattr(args, "schedule_timesteps", None) or args.timesteps
+    schedule_updates = max(1, int(schedule_steps // (n * steps)))
     schedule = optax.linear_schedule(
         config["LR"],
         1e-10,
-        num_updates * config["UPDATE_EPOCHS"] * config["NUM_MINIBATCHES"],
+        schedule_updates * config["UPDATE_EPOCHS"] * config["NUM_MINIBATCHES"],
     )
     optimizer = (
         optax.adamw(schedule, eps=1e-5, weight_decay=args.weight_decay)
@@ -642,7 +826,7 @@ def run_one(args, variant, seed, config):
             "input_t, posterior_mean, posterior_log_variance"
             if variant in IB_DIVERGENCES
             else "input_t"
-            if variant == "mlp"
+            if variant.removesuffix("_prediction") == "mlp"
             else "input_t, projected_lru_output"
         ),
         "normalization": "fixed_calibration_rms_excess_above_one_bit"
@@ -650,6 +834,21 @@ def run_one(args, variant, seed, config):
         else None,
         "rms_calibration": calibration,
         "rms_scales_bits": rms_scales,
+        "prediction_head_inputs": (
+            "shared_mlp_hidden"
+            if variant == "mlp_prediction"
+            else "input_t, posterior_mean, posterior_log_variance"
+            if variant in IB_DIVERGENCES
+            else "input_t, final_lru_output"
+        )
+        if variant.endswith("_prediction")
+        else None,
+        "prediction_coefficient": getattr(args, "prediction_coefficient", 1.0)
+        if variant.endswith("_prediction")
+        else 0,
+        "prediction_target": "branch CNN embedding (512), reward; selected action; both CNN paths detached"
+        if variant.endswith("_prediction")
+        else None,
         "variant": variant,
         "seed": seed,
         "upstream_commit": "d061b611718ae55d095791b4ea7046b5266cafd4",
@@ -665,6 +864,11 @@ def run_one(args, variant, seed, config):
         "kl_prior_gradient_weight": 2 * KL_BALANCES.get(variant, 0.5),
         "kl_posterior_gradient_weight": 2 * (1 - KL_BALANCES.get(variant, 0.5)),
         "posterior_input": posterior_input,
+        "recurrent_state_quantization": getattr(
+            args, "recurrent_state_quantization", "none"
+        ),
+        "fsq_levels": getattr(args, "fsq_levels", 5),
+        "fsq_scale": getattr(args, "fsq_scale", 1.0),
         "lru_residual": residual,
         "ib_free_bits": 1,
         "ib_distribution": "diagonal multivariate normal",
@@ -682,20 +886,90 @@ def run_one(args, variant, seed, config):
             for path in (
                 Path(__file__),
                 Path(__file__).with_name("memory_models.py"),
+                Path(__file__).with_name("calibrate_divergences.py"),
+                Path(__file__).with_name("checkpoints.py"),
                 Path("uv.lock"),
             )
         },
         "jax_version": jax.__version__,
         "evaluation_episodes": args.eval_episodes,
+        "learning_rate_schedule_steps": schedule_steps,
+        "gradient_log_interval": getattr(args, "gradient_log_interval", 0),
+        "resume_from": str(external_resume) if external_resume is not None else None,
+        "budget_extension": bool(getattr(args, "extend_training", False)),
+        "extension_schedule_policy": (
+            "preserved horizon and optimizer counter"
+            if schedule_steps
+            == source_record["run_metadata"].get("learning_rate_schedule_steps")
+            else "new horizon with preserved optimizer counter"
+        )
+        if source_record is not None
+        else None,
+        "checkpoint_interval": getattr(args, "checkpoint_interval", 0),
+        "checkpoint_state": "full_training_state"
+        if getattr(args, "checkpoint_interval", 0)
+        else None,
     }
+    start_update = 0
+    previous_elapsed = 0.0
+    local_checkpoint = bool(
+        list((directory / "checkpoints").glob("step_*/checkpoint.json"))
+    )
+    resume_location = (
+        directory if local_checkpoint or external_resume is None else external_resume
+    )
+    restored = restore_checkpoint(
+        resume_location,
+        (network, opt_state, runner),
+        metadata,
+        n * steps,
+        allow_budget_extension=bool(getattr(args, "extend_training", False)),
+    )
+    if restored is not None:
+        (network, opt_state, runner), saved = restored
+        start_update = saved["completed_updates"]
+        previous_elapsed = saved["elapsed_seconds"]
+        if resume_location != directory and source_run is not None:
+            shutil.copy2(source_run / "training.jsonl", directory / "training.jsonl")
+            if (source_run / "gradient_norms.jsonl").exists():
+                shutil.copy2(
+                    source_run / "gradient_norms.jsonl",
+                    directory / "gradient_norms.jsonl",
+                )
+        trim_training_log(directory / "training.jsonl", start_update)
+        gradient_log = directory / "gradient_norms.jsonl"
+        if gradient_log.exists():
+            kept = []
+            for line in gradient_log.read_text().splitlines():
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    break
+                if row["steps"] <= saved["actual_steps"]:
+                    kept.append(row)
+            gradient_log.write_text("".join(json.dumps(row) + "\n" for row in kept))
+        print(
+            f"RESUME {variant} seed={seed} update={start_update} steps={saved['actual_steps']}",
+            flush=True,
+        )
     (directory / "config.json").write_text(json.dumps(metadata, indent=2))
-    update = build_update(env, params, config, tx, args.ib_coefficient, rms_scales)
+    gradient_interval = getattr(args, "gradient_log_interval", 0)
+    update = build_update(
+        env,
+        params,
+        config,
+        tx,
+        args.ib_coefficient,
+        rms_scales,
+        log_gradients=bool(gradient_interval),
+        prediction_coefficient=getattr(args, "prediction_coefficient", 1.0),
+    )
     print(
         f"START {variant} seed={seed} updates={num_updates} device={jax.devices()[0]}",
         flush=True,
     )
-    with (directory / "training.jsonl").open("w") as log:
-        for index in range(num_updates):
+    with (directory / "training.jsonl").open("a" if start_update else "w") as log:
+        for index in range(start_update, num_updates):
             network, opt_state, runner, metrics, completed, return_sum = update(
                 network, opt_state, runner
             )
@@ -708,7 +982,7 @@ def run_one(args, variant, seed, config):
             record = {
                 "update": index + 1,
                 "steps": (index + 1) * n * steps,
-                "seconds": time.monotonic() - started,
+                "seconds": previous_elapsed + time.monotonic() - started,
                 "loss": float(metrics[0]),
                 "policy_loss": float(metrics[1]),
                 "value_loss": float(metrics[2]),
@@ -722,11 +996,85 @@ def run_one(args, variant, seed, config):
                 "episodes": completed,
                 "training_return": float(return_sum) / completed if completed else None,
             }
+            if network.actor.cells and network.actor.cells[0].quantization != "none":
+                names = [
+                    f"fsq_{branch}_{component}_{metric}"
+                    for branch in ("actor", "critic")
+                    for component in ("real", "imag")
+                    for metric in (
+                        "error",
+                        "saturation",
+                        "utilization",
+                        "entropy_nats",
+                        "change",
+                    )
+                ]
+                record.update(zip(names, map(float, metrics[-20:])))
+            if variant.endswith("_prediction"):
+                record["prediction_observation_mse"] = float(metrics[7])
+                record["prediction_reward_mse"] = float(metrics[8])
+            if gradient_interval:
+                record.update(
+                    {
+                        "gradient_norm_pre_clip_mean": float(metrics[9]),
+                        "gradient_norm_pre_clip_max": float(metrics[10]),
+                        "gradient_norm_post_clip_mean": float(metrics[11]),
+                        "actor_gradient_norm_mean": float(metrics[12]),
+                        "critic_gradient_norm_mean": float(metrics[13]),
+                    }
+                )
+                if (
+                    checkpoint_due(
+                        index * n * steps, (index + 1) * n * steps, gradient_interval
+                    )
+                    or index + 1 == num_updates
+                ):
+                    with (directory / "gradient_norms.jsonl").open("a") as gradient_log:
+                        gradient_log.write(
+                            json.dumps(
+                                {
+                                    **record,
+                                    "sampled_rollout_steps": n * steps,
+                                    "ppo_minibatches_in_sample": config["UPDATE_EPOCHS"]
+                                    * config["NUM_MINIBATCHES"],
+                                    "clip_threshold": config["MAX_GRAD_NORM"],
+                                }
+                            )
+                            + "\n"
+                        )
             log.write(json.dumps(record) + "\n")
             log.flush()
+            interval = getattr(args, "checkpoint_interval", 0)
+            if checkpoint_due(index * n * steps, (index + 1) * n * steps, interval):
+                saved_path = save_checkpoint(
+                    directory,
+                    (network, opt_state, runner),
+                    metadata,
+                    index + 1,
+                    (index + 1) * n * steps,
+                    record["seconds"],
+                    interval,
+                    final=index + 1 == num_updates,
+                )
+                print(f"CHECKPOINT {saved_path}", flush=True)
             if index == 0 or (index + 1) % 10 == 0 or index + 1 == num_updates:
                 print(json.dumps({"variant": variant, **record}), flush=True)
-    eqx.tree_serialise_leaves(directory / "model.eqx", network)
+    if getattr(args, "checkpoint_interval", 0):
+        saved_path = save_checkpoint(
+            directory,
+            (network, opt_state, runner),
+            metadata,
+            num_updates,
+            num_updates * n * steps,
+            previous_elapsed + time.monotonic() - started,
+            args.checkpoint_interval,
+            final=True,
+        )
+        print(f"FINAL CHECKPOINT {saved_path}", flush=True)
+    temporary_model = directory / ".model.eqx.tmp"
+    with temporary_model.open("wb") as stream:
+        eqx.tree_serialise_leaves(stream, network)
+    temporary_model.replace(directory / "model.eqx")
     scores = evaluate(
         network,
         env,
@@ -742,7 +1090,7 @@ def run_one(args, variant, seed, config):
         "evaluation_mean": float(scores.mean()),
         "evaluation_std": float(scores.std(ddof=1)),
         "evaluation_standard_error": float(scores.std(ddof=1) / np.sqrt(len(scores))),
-        "seconds": time.monotonic() - started,
+        "seconds": previous_elapsed + time.monotonic() - started,
     }
     (directory / "result.json").write_text(json.dumps(result, indent=2))
     print("RESULT " + json.dumps(result), flush=True)
@@ -753,6 +1101,13 @@ def run_one(args, variant, seed, config):
 def build_parser(defaults=None):
     defaults = upstream_config() if defaults is None else defaults
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--recurrent-state-quantization",
+        choices=("none", "fsq", "output"),
+        default="none",
+    )
+    parser.add_argument("--fsq-levels", type=int, default=5)
+    parser.add_argument("--fsq-scale", type=float, default=1.0)
     parser.add_argument(
         "--timesteps", type=int, default=int(defaults["TOTAL_TIMESTEPS"])
     )
@@ -779,12 +1134,41 @@ def build_parser(defaults=None):
         help="Default IB preset: fixed_rms with automatic calibration; other variants: none",
     )
     parser.add_argument("--rms-calibration", type=Path)
+    parser.add_argument(
+        "--checkpoint-interval",
+        type=int,
+        default=0,
+        help="Save resumable training state at rollout boundaries crossing this many steps; 0 disables periodic saves",
+    )
+    parser.add_argument(
+        "--gradient-log-interval",
+        type=int,
+        default=0,
+        help="Sample pre/post clipping and actor/critic gradient norms at this many environment steps",
+    )
+    parser.add_argument(
+        "--resume-from",
+        type=Path,
+        help="Resume full state from a run or checkpoint directory into a fresh output directory",
+    )
+    parser.add_argument(
+        "--extend-training",
+        action="store_true",
+        help="Explicitly permit a larger total budget when using --resume-from",
+    )
+    parser.add_argument(
+        "--schedule-timesteps",
+        type=int,
+        default=None,
+        help="LR schedule horizon; defaults to the requested total budget, with optimizer counters preserved on resume",
+    )
     parser.add_argument("--partial-obs", action="store_true")
     parser.add_argument("--env", default=defaults["ENV_NAME"])
     parser.add_argument("--hidden", type=int, default=512)
     parser.add_argument("--layers", type=int, default=2)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--dropout", type=float, default=0.1)
+    parser.add_argument("--prediction-coefficient", type=float, default=1.0)
     parser.add_argument("--ib-coefficient", type=float, default=1.0)
     parser.add_argument("--eval-episodes", type=int, default=64)
     parser.add_argument("--output", type=Path, default=Path("results/memory_bias"))
@@ -797,6 +1181,22 @@ def main():
     args = parser.parse_args()
     if args.ib_normalization == "none" and args.rms_calibration is not None:
         parser.error("--ib-normalization none conflicts with --rms-calibration")
+    if args.resume_from is not None and (
+        len(args.variants) != 1 or len(args.seeds) != 1
+    ):
+        parser.error("--resume-from requires exactly one variant and seed")
+    if args.extend_training and args.resume_from is None:
+        parser.error(
+            "--extend-training requires --resume-from and a fresh output directory"
+        )
+    if args.gradient_log_interval < 0 or (
+        args.schedule_timesteps is not None and args.schedule_timesteps < 1
+    ):
+        parser.error(
+            "Gradient interval must be nonnegative and schedule horizon positive"
+        )
+    if args.checkpoint_interval < 0:
+        parser.error("--checkpoint-interval must be nonnegative")
     if not 0 <= args.dropout < 1:
         parser.error("--dropout must be in [0, 1)")
     if (

@@ -1,0 +1,15 @@
+{
+  "runs": 42,
+  "environment": "CartPoleHard",
+  "modes": [
+    "mdp",
+    "pomdp"
+  ],
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "requested_steps_per_run": 100000,
+  "git_head": "a3f863c492c06dc20f7a5572e0756162d62b9217"
+}

@@ -1,0 +1,139 @@
+{
+  "head_inputs": "input_t, posterior_mean, posterior_log_variance",
+  "normalization": "fixed_calibration_rms_excess_above_one_bit",
+  "rms_calibration": {
+    "env": "NavigatorEasy",
+    "partial_obs": true,
+    "posterior_input": "output",
+    "seed": 0,
+    "residual": true,
+    "hidden": 512,
+    "layers": 2,
+    "samples": 2048,
+    "policy": "uniform_random_5_actions",
+    "calibration_seed": 900000,
+    "batch_sha256": "50ad36f7020b43c21f901db246101989d126f85736ab6f0c157a3933b4f56da1",
+    "scales_bits": {
+      "forward_kl": [
+        5.60585756083356,
+        5.86688296190616
+      ],
+      "reverse_kl": [
+        5.619768782928402,
+        5.849638653455574
+      ],
+      "symmetric_kl": [
+        5.6128101171830895,
+        5.858259408727918
+      ],
+      "renyi_half": [
+        2.803186681789107,
+        2.9257809961645505
+      ]
+    },
+    "raw": {
+      "forward_kl": {
+        "mean_bits": [
+          5.56763195155405,
+          5.82488210292042
+        ],
+        "max_bits": [
+          6.274734046073108,
+          6.476448369686475
+        ]
+      },
+      "reverse_kl": {
+        "mean_bits": [
+          5.581438590953991,
+          5.807789154030443
+        ],
+        "max_bits": [
+          6.282000657037363,
+          6.463382503735126
+        ]
+      },
+      "symmetric_kl": {
+        "mean_bits": [
+          5.5745352699943815,
+          5.816335634689649
+        ],
+        "max_bits": [
+          6.278367007589933,
+          6.469915780676102
+        ]
+      },
+      "renyi_half": {
+        "mean_bits": [
+          2.784095886610702,
+          2.9048702956440486
+        ],
+        "max_bits": [
+          3.1352182717966737,
+          3.2310043531600168
+        ]
+      }
+    },
+    "minimum_scale_bits": 1e-08
+  },
+  "rms_scales_bits": [
+    5.6128101171830895,
+    5.858259408727918
+  ],
+  "variant": "ib_symmetric_prior80",
+  "seed": 0,
+  "upstream_commit": "d061b611718ae55d095791b4ea7046b5266cafd4",
+  "config": {
+    "TRAIN_TYPE": "PPO_RNN",
+    "MEMORY_TYPE": "lru",
+    "SEED": 0,
+    "NUM_SEEDS": 1,
+    "LR": 0.0001,
+    "NUM_ENVS": 16,
+    "NUM_STEPS": 128,
+    "TOTAL_TIMESTEPS": 100000,
+    "UPDATE_EPOCHS": 4,
+    "NUM_MINIBATCHES": 16,
+    "GAMMA": 0.99,
+    "GAE_LAMBDA": 0.95,
+    "CLIP_EPS": 0.2,
+    "ENT_COEF": 0.01,
+    "VF_COEF": 0.5,
+    "MAX_GRAD_NORM": 0.5,
+    "ENV_NAME": "NavigatorEasy",
+    "PARTIAL": true,
+    "ANNEAL_LR": true,
+    "DEBUG": true,
+    "PROJECT": "popgym_arcade-acrade-",
+    "ENTITY": "",
+    "WANDB_MODE": "disabled",
+    "OBS_SIZE": 128
+  },
+  "requested_steps": 100000,
+  "actual_steps": 98304,
+  "weight_decay": 0,
+  "state_dropout": 0,
+  "ib_coefficient": 1.0,
+  "ib_kl_units": "bits",
+  "ib_divergence_units": "bits",
+  "divergence": "symmetric_kl",
+  "kl_prior_gradient_weight": 1.6,
+  "kl_posterior_gradient_weight": 0.3999999999999999,
+  "posterior_input": "output",
+  "lru_residual": true,
+  "ib_free_bits": 1,
+  "ib_distribution": "diagonal multivariate normal",
+  "hidden": 512,
+  "layers": 2,
+  "flattened_state_real_dimension_per_branch": 2048,
+  "gaussian_dimension_per_branch": 1365,
+  "device": "cuda:0",
+  "device_kind": "Tesla T4",
+  "parameter_count": 16407454,
+  "source_sha256": {
+    "memory_bias.py": "72ca9be43ed2786c8036c372f32d6771d5690ce79bc0811d2980ea506f94fbd0",
+    "memory_models.py": "f932038296863684f1149a5b79e5b487805a80a30e44563e658004d62b308422",
+    "uv.lock": "b69e580fd829cad42f78b217800db80138de4fbf72728bc61d2d3b68e65a46a7"
+  },
+  "jax_version": "0.6.2",
+  "evaluation_episodes": 64
+}

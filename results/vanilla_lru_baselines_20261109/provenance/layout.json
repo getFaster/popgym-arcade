@@ -1,0 +1,8 @@
+{
+  "previous_root": "results/vanilla_lru_pomdp_20261109",
+  "current_root": "results/vanilla_lru_baselines_20261109",
+  "layout": "TASK/{mdp,pomdp}/lru_seed0",
+  "original_pomdp_layout": "TASK/lru_seed0",
+  "archived_execution_files": "provenance/",
+  "note": "Original paths inside archived logs/scripts and reused_from metadata are historical provenance, not dependencies."
+}

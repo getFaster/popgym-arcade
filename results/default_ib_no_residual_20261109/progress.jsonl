@@ -1,0 +1,8 @@
+{"task": "CartPoleHard", "mode": "mdp", "returncode": 0, "seconds": 371.89928284700727}
+{"task": "CartPoleHard", "mode": "pomdp", "returncode": 0, "seconds": 397.0015161909978}
+{"task": "NavigatorEasy", "mode": "mdp", "returncode": 0, "seconds": 472.3701083979977}
+{"task": "NavigatorEasy", "mode": "pomdp", "returncode": 0, "seconds": 478.9629040299915}
+{"task": "MineSweeperEasy", "mode": "mdp", "returncode": 0, "seconds": 407.7245663610229}
+{"task": "MineSweeperEasy", "mode": "pomdp", "returncode": 0, "seconds": 418.39972228498664}
+{"task": "BreakoutEasy", "mode": "mdp", "returncode": 0, "seconds": 374.6206003410043}
+{"task": "BreakoutEasy", "mode": "pomdp", "returncode": 0, "seconds": 381.0908729900257}

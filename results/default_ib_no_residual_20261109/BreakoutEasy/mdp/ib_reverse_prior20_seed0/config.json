@@ -1,0 +1,140 @@
+{
+  "head_inputs": "input_t, posterior_mean, posterior_log_variance",
+  "normalization": "fixed_calibration_rms_excess_above_one_bit",
+  "rms_calibration": {
+    "env": "BreakoutEasy",
+    "partial_obs": false,
+    "posterior_input": "output",
+    "seed": 0,
+    "residual": false,
+    "hidden": 512,
+    "layers": 2,
+    "obs_size": 128,
+    "samples": 2048,
+    "policy": "uniform_random_5_actions",
+    "calibration_seed": 900000,
+    "batch_sha256": "97aaba67245cfb2cec65d44c08a82f663184156a62048d1ea90ccec3a9ec3c7d",
+    "scales_bits": {
+      "forward_kl": [
+        4.300034666449684,
+        4.33633139687721
+      ],
+      "reverse_kl": [
+        4.307697596848712,
+        4.32807062433442
+      ],
+      "symmetric_kl": [
+        4.303865589300369,
+        4.332199639068137
+      ],
+      "renyi_half": [
+        2.150013863912467,
+        2.1643091844875926
+      ]
+    },
+    "raw": {
+      "forward_kl": {
+        "mean_bits": [
+          4.290607253489543,
+          4.32596446816886
+        ],
+        "max_bits": [
+          4.666794978547442,
+          4.62910566854146
+        ]
+      },
+      "reverse_kl": {
+        "mean_bits": [
+          4.29826121758571,
+          4.317798804041195
+        ],
+        "max_bits": [
+          4.6704200288623285,
+          4.620195591365561
+        ]
+      },
+      "symmetric_kl": {
+        "mean_bits": [
+          4.2944342328503975,
+          4.321881633543763
+        ],
+        "max_bits": [
+          4.668607331722234,
+          4.624650629953511
+        ]
+      },
+      "renyi_half": {
+        "mean_bits": [
+          2.1453078177301994,
+          2.159159311557497
+        ],
+        "max_bits": [
+          2.3320011621313657,
+          2.3103313481226517
+        ]
+      }
+    },
+    "minimum_scale_bits": 1e-08
+  },
+  "rms_scales_bits": [
+    4.307697596848712,
+    4.32807062433442
+  ],
+  "variant": "ib_reverse_prior20",
+  "seed": 0,
+  "upstream_commit": "d061b611718ae55d095791b4ea7046b5266cafd4",
+  "config": {
+    "TRAIN_TYPE": "PPO_RNN",
+    "MEMORY_TYPE": "lru",
+    "SEED": 0,
+    "NUM_SEEDS": 1,
+    "LR": 0.0001,
+    "NUM_ENVS": 16,
+    "NUM_STEPS": 128,
+    "TOTAL_TIMESTEPS": 100000,
+    "UPDATE_EPOCHS": 4,
+    "NUM_MINIBATCHES": 16,
+    "GAMMA": 0.99,
+    "GAE_LAMBDA": 0.95,
+    "CLIP_EPS": 0.2,
+    "ENT_COEF": 0.01,
+    "VF_COEF": 0.5,
+    "MAX_GRAD_NORM": 0.5,
+    "ENV_NAME": "BreakoutEasy",
+    "PARTIAL": false,
+    "ANNEAL_LR": true,
+    "DEBUG": true,
+    "PROJECT": "popgym_arcade-acrade-",
+    "ENTITY": "",
+    "WANDB_MODE": "disabled",
+    "OBS_SIZE": 128
+  },
+  "requested_steps": 100000,
+  "actual_steps": 98304,
+  "weight_decay": 0,
+  "state_dropout": 0,
+  "ib_coefficient": 1.0,
+  "ib_kl_units": "bits",
+  "ib_divergence_units": "bits",
+  "divergence": "reverse_kl",
+  "kl_prior_gradient_weight": 0.4,
+  "kl_posterior_gradient_weight": 1.6,
+  "posterior_input": "output",
+  "lru_residual": false,
+  "ib_free_bits": 1,
+  "ib_distribution": "diagonal multivariate normal",
+  "hidden": 512,
+  "layers": 2,
+  "flattened_state_real_dimension_per_branch": 2048,
+  "gaussian_dimension_per_branch": 1365,
+  "device": "cuda:0",
+  "device_kind": "NVIDIA GeForce RTX 2060 with Max-Q Design",
+  "parameter_count": 16407454,
+  "source_sha256": {
+    "memory_bias.py": "87ace0d57c0ae728c3940cb0e8941617cbe1cd25eeb7446f0e4b0048d2437536",
+    "memory_models.py": "4076996c0597874ab0e5b15653d492a4eb05ca59988df411a6b5be9f19b927f1",
+    "uv.lock": "b69e580fd829cad42f78b217800db80138de4fbf72728bc61d2d3b68e65a46a7"
+  },
+  "jax_version": "0.6.2",
+  "evaluation_episodes": 64
+}

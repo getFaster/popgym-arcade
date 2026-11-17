@@ -1,0 +1,5 @@
+{
+  "cpu_tests": {"command": "JAX_PLATFORMS=cpu uv run pytest -q tests/test_lru_prediction.py tests/test_memory_bias.py", "passed": 66},
+  "lint": "passed",
+  "invariants": ["zero CNN gradients from embedding prediction on both input and target paths", "nonzero LRU and prediction-head gradients", "selected-action supervision", "terminal embedding masking and terminal reward supervision", "serial rollout / parallel replay agreement with resets"]
+}

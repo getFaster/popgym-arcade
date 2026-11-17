@@ -1,0 +1,133 @@
+{
+  "worker": "local",
+  "total_runs": 64,
+  "all_suite_runs": 128,
+  "timesteps": 100000,
+  "actual_steps": 98304,
+  "seed": 0,
+  "eval_episodes": 64,
+  "residual": true,
+  "head_inputs": "input_t, posterior_mean, posterior_log_variance",
+  "groups": [
+    {
+      "env": "CartPoleHard",
+      "partial_obs": false,
+      "posterior_input": "output",
+      "variants": [
+        "ib_forward_prior20",
+        "ib_forward_prior80",
+        "ib_reverse_prior20",
+        "ib_reverse_prior80",
+        "ib_symmetric_prior20",
+        "ib_symmetric_prior80",
+        "ib_renyi_half_prior20",
+        "ib_renyi_half_prior80"
+      ]
+    },
+    {
+      "env": "CartPoleHard",
+      "partial_obs": false,
+      "posterior_input": "state",
+      "variants": [
+        "ib_forward_prior20",
+        "ib_forward_prior80",
+        "ib_reverse_prior20",
+        "ib_reverse_prior80",
+        "ib_symmetric_prior20",
+        "ib_symmetric_prior80",
+        "ib_renyi_half_prior20",
+        "ib_renyi_half_prior80"
+      ]
+    },
+    {
+      "env": "NavigatorEasy",
+      "partial_obs": false,
+      "posterior_input": "output",
+      "variants": [
+        "ib_forward_prior20",
+        "ib_forward_prior80",
+        "ib_reverse_prior20",
+        "ib_reverse_prior80",
+        "ib_symmetric_prior20",
+        "ib_symmetric_prior80",
+        "ib_renyi_half_prior20",
+        "ib_renyi_half_prior80"
+      ]
+    },
+    {
+      "env": "NavigatorEasy",
+      "partial_obs": false,
+      "posterior_input": "state",
+      "variants": [
+        "ib_forward_prior20",
+        "ib_forward_prior80",
+        "ib_reverse_prior20",
+        "ib_reverse_prior80",
+        "ib_symmetric_prior20",
+        "ib_symmetric_prior80",
+        "ib_renyi_half_prior20",
+        "ib_renyi_half_prior80"
+      ]
+    },
+    {
+      "env": "MineSweeperEasy",
+      "partial_obs": false,
+      "posterior_input": "output",
+      "variants": [
+        "ib_forward_prior20",
+        "ib_forward_prior80",
+        "ib_reverse_prior20",
+        "ib_reverse_prior80",
+        "ib_symmetric_prior20",
+        "ib_symmetric_prior80",
+        "ib_renyi_half_prior20",
+        "ib_renyi_half_prior80"
+      ]
+    },
+    {
+      "env": "MineSweeperEasy",
+      "partial_obs": false,
+      "posterior_input": "state",
+      "variants": [
+        "ib_forward_prior20",
+        "ib_forward_prior80",
+        "ib_reverse_prior20",
+        "ib_reverse_prior80",
+        "ib_symmetric_prior20",
+        "ib_symmetric_prior80",
+        "ib_renyi_half_prior20",
+        "ib_renyi_half_prior80"
+      ]
+    },
+    {
+      "env": "BreakoutEasy",
+      "partial_obs": false,
+      "posterior_input": "output",
+      "variants": [
+        "ib_forward_prior20",
+        "ib_forward_prior80",
+        "ib_reverse_prior20",
+        "ib_reverse_prior80",
+        "ib_symmetric_prior20",
+        "ib_symmetric_prior80",
+        "ib_renyi_half_prior20",
+        "ib_renyi_half_prior80"
+      ]
+    },
+    {
+      "env": "BreakoutEasy",
+      "partial_obs": false,
+      "posterior_input": "state",
+      "variants": [
+        "ib_forward_prior20",
+        "ib_forward_prior80",
+        "ib_reverse_prior20",
+        "ib_reverse_prior80",
+        "ib_symmetric_prior20",
+        "ib_symmetric_prior80",
+        "ib_renyi_half_prior20",
+        "ib_renyi_half_prior80"
+      ]
+    }
+  ]
+}

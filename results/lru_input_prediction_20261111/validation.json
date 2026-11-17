@@ -1,0 +1,15 @@
+{
+  "cpu_tests": {
+    "command": "JAX_PLATFORMS=cpu uv run pytest -q tests/test_lru_prediction.py tests/test_memory_bias.py",
+    "passed": 70
+  },
+  "lint": "passed",
+  "invariants": [
+    "LRU and IB prediction rollout/replay agreement",
+    "zero CNN gradients from embedding prediction on current and target paths for both architectures",
+    "nonzero LRU and prediction-head gradients",
+    "selected-action supervision",
+    "terminal embedding masking and terminal reward supervision",
+    "MLP auxiliary gradients reach shared hidden layer and leave CNN and PPO output layer gradients zero"
+  ]
+}

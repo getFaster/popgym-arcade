@@ -212,3 +212,21 @@ POMDP-only directory. Checkpoints, episode returns, full logs, configs, and
 provenance are self-contained. Summary tables and the cached comparison CSV
 cover both modes. Archived execution scripts retain original paths as historical
 records. Older result directories are not required to preserve these baselines.
+
+## Default-IB residual ablation
+
+The eight-run local-GPU comparison is organized in
+`results/default_ib_no_residual_20261109/RESULTS.md`: the default reverse-KL,
+output, prior20 IB with residuals disabled, compared with the saved
+residual-enabled configuration and vanilla LRU within each task/mode. New runs
+retain seed 0, 98304 actual steps, and 64 evaluation episodes; each architecture
+uses freshly calibrated frozen RMS scales. Score tables, episode SEs, the
+`LRU mean - LRU episode SE` criterion, training diagnostics, calibration tables,
+and an artifact audit are included. Reference metadata, per-episode returns,
+and training logs are bundled for regeneration after older suites are removed.
+The provisional residual-enabled repository default is unchanged.
+
+```bash
+JAX_PLATFORMS=cpu uv run python -m popgym_arcade.experiments.report_residual_ablation \
+  results/default_ib_no_residual_20261109
+```

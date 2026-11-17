@@ -1,0 +1,8 @@
+{
+  "time_utc": "2026-11-09T15:23:59.556127+00:00",
+  "allocation_process_terminated": true,
+  "supervisor_running": false,
+  "further_requests_authorized": false,
+  "local_session_names": [],
+  "server_not_queried_after_stop": true
+}

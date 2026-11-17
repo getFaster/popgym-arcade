@@ -1,0 +1,152 @@
+{
+  "head_inputs": "input_t, posterior_mean, posterior_log_variance",
+  "normalization": "fixed_calibration_rms_excess_above_one_bit",
+  "rms_calibration": {
+    "env": "CartPoleHard",
+    "partial_obs": false,
+    "posterior_input": "output",
+    "seed": 0,
+    "residual": true,
+    "hidden": 512,
+    "layers": 2,
+    "obs_size": 128,
+    "samples": 2048,
+    "policy": "uniform_random_5_actions",
+    "calibration_seed": 900000,
+    "batch_sha256": "bda9662a4bfeebf37e93b74111706cf35728553d04d103d0bc1c3448e74f3ba3",
+    "scales_bits": {
+      "forward_kl": [
+        5.298982942117758,
+        5.456675708189641
+      ],
+      "reverse_kl": [
+        5.312852475283186,
+        5.4435899223663
+      ],
+      "symmetric_kl": [
+        5.305915355684174,
+        5.450131764529839
+      ],
+      "renyi_half": [
+        2.650102403039933,
+        2.722185342842962
+      ]
+    },
+    "raw": {
+      "forward_kl": {
+        "mean_bits": [
+          5.27031253623171,
+          5.425659800818368
+        ],
+        "max_bits": [
+          5.918650846767696,
+          5.9624678986239195
+        ]
+      },
+      "reverse_kl": {
+        "mean_bits": [
+          5.284052427888417,
+          5.412710826721773
+        ],
+        "max_bits": [
+          5.929507767551364,
+          5.939244049382009
+        ]
+      },
+      "symmetric_kl": {
+        "mean_bits": [
+          5.277182485922955,
+          5.41918531439989
+        ],
+        "max_bits": [
+          5.924079307159531,
+          5.950855630037663
+        ]
+      },
+      "renyi_half": {
+        "mean_bits": [
+          2.6357680458847934,
+          2.706746051084309
+        ],
+        "max_bits": [
+          2.958459318754103,
+          2.971925904281963
+        ]
+      }
+    },
+    "minimum_scale_bits": 1e-08
+  },
+  "rms_scales_bits": [
+    5.312852475283186,
+    5.4435899223663
+  ],
+  "prediction_head_inputs": "input_t, posterior_mean, posterior_log_variance",
+  "prediction_coefficient": 1.0,
+  "prediction_target": "branch CNN embedding (512), reward; selected action; both CNN paths detached",
+  "variant": "ib_reverse_prior20_prediction",
+  "seed": 0,
+  "upstream_commit": "d061b611718ae55d095791b4ea7046b5266cafd4",
+  "config": {
+    "TRAIN_TYPE": "PPO_RNN",
+    "MEMORY_TYPE": "lru",
+    "SEED": 0,
+    "NUM_SEEDS": 1,
+    "LR": 0.0001,
+    "NUM_ENVS": 16,
+    "NUM_STEPS": 128,
+    "TOTAL_TIMESTEPS": 100000,
+    "UPDATE_EPOCHS": 4,
+    "NUM_MINIBATCHES": 16,
+    "GAMMA": 0.99,
+    "GAE_LAMBDA": 0.95,
+    "CLIP_EPS": 0.2,
+    "ENT_COEF": 0.01,
+    "VF_COEF": 0.5,
+    "MAX_GRAD_NORM": 0.5,
+    "ENV_NAME": "CartPoleHard",
+    "PARTIAL": false,
+    "ANNEAL_LR": true,
+    "DEBUG": true,
+    "PROJECT": "popgym_arcade-acrade-",
+    "ENTITY": "",
+    "WANDB_MODE": "disabled",
+    "OBS_SIZE": 128
+  },
+  "requested_steps": 100000,
+  "actual_steps": 98304,
+  "weight_decay": 0,
+  "state_dropout": 0,
+  "ib_coefficient": 1.0,
+  "ib_kl_units": "bits",
+  "ib_divergence_units": "bits",
+  "divergence": "reverse_kl",
+  "kl_prior_gradient_weight": 0.4,
+  "kl_posterior_gradient_weight": 1.6,
+  "posterior_input": "output",
+  "lru_residual": true,
+  "ib_free_bits": 1,
+  "ib_distribution": "diagonal multivariate normal",
+  "hidden": 512,
+  "layers": 2,
+  "flattened_state_real_dimension_per_branch": 2048,
+  "gaussian_dimension_per_branch": 1365,
+  "device": "cuda:0",
+  "device_kind": "NVIDIA GeForce RTX 2060 with Max-Q Design",
+  "parameter_count": 33074824,
+  "source_sha256": {
+    "memory_bias.py": "1425b219905d14a471c66e1d29677213b17b5df90fbb848705141cb276381b2a",
+    "memory_models.py": "94bf81174e26cdb6f48010ae5beb5caba4841ccbd3752fa89e3090dd3bd1deec",
+    "calibrate_divergences.py": "85e309c68907cb8c0a996c86ba32d27c384387c5af7bc74807d17568ee836d12",
+    "checkpoints.py": "51266bdebad9cc60d8375c0373b27653e4c877b70d12dbd5b672958441c61c9d",
+    "uv.lock": "b69e580fd829cad42f78b217800db80138de4fbf72728bc61d2d3b68e65a46a7"
+  },
+  "jax_version": "0.6.2",
+  "evaluation_episodes": 64,
+  "learning_rate_schedule_steps": 100000,
+  "gradient_log_interval": 0,
+  "resume_from": null,
+  "budget_extension": false,
+  "extension_schedule_policy": null,
+  "checkpoint_interval": 0,
+  "checkpoint_state": null
+}

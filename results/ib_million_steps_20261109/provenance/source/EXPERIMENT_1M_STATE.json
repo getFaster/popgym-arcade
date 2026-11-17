@@ -1,0 +1,466 @@
+{
+  "schema_version": 1,
+  "task_id": "popgym_arcade_1m_lru_ib_residual_comparison",
+  "updated_at_utc": "2026-11-09T15:13:46.330289+00:00",
+  "repository": "/home/user/popgym_arcade",
+  "git": {
+    "branch": "experiments/memory-bias-divergences",
+    "last_commit": "a3f863c492c06dc20f7a5572e0756162d62b9217",
+    "last_commit_subject": "Set reverse-KL output prior20 as the default IB preset",
+    "new_1m_implementation_committed": false,
+    "preserve_existing_changes": "Working tree also contains earlier report changes and user-owned deletions of obsolete result directories. Do not revert or stage those indiscriminately."
+  },
+  "status": {
+    "phase": "colab_allocation_pending",
+    "official_runs_started": 0,
+    "official_runs_completed": 0,
+    "official_training_steps_collected": 0,
+    "latest_user_instruction": "Continue this EXPERIMENT_1M_STATE.json on colab.",
+    "do_not_start_colab_without_explicit_user_resume": false,
+    "resume_policy": "User explicitly authorized resuming on Colab in this session.",
+    "allocation_attempts": [
+      {
+        "gpu": "T4",
+        "result": "HTTP 503 Service Unavailable; no runtime created"
+      },
+      {
+        "gpu": "L4",
+        "result": "HTTP 503 Service Unavailable; no runtime created"
+      },
+      {
+        "gpu": "A100",
+        "result": "pending; final allocation attempt"
+      }
+    ]
+  },
+  "user_requirements": [
+    "Compare default IB with residuals, default IB without residuals, and vanilla LRU at 1,000,000 requested training steps.",
+    "Run the official experiments on Colab, not the local GPU.",
+    "Save checkpoints every 100,000 steps and preserve every periodic checkpoint plus the final checkpoint.",
+    "Checkpoints must support exact resume and future extension of the total training budget.",
+    "Track gradient norms roughly ten times per checkpoint interval (10,000-step logging cadence).",
+    "Explicit user resume received; run on Colab and release the runtime after complete artifact sync."
+  ],
+  "experiment_plan": {
+    "scope_basis": "Same four task families and both MDP/POMDP modes as preceding experiments; this 24-run scope was stated to the user. No narrowing was requested.",
+    "tasks": [
+      "CartPoleHard",
+      "NavigatorEasy",
+      "MineSweeperEasy",
+      "BreakoutEasy"
+    ],
+    "modes": [
+      "mdp",
+      "pomdp"
+    ],
+    "conditions": [
+      "vanilla_lru",
+      "ib_residual",
+      "ib_no_residual"
+    ],
+    "runs_total": 24,
+    "seed": 0,
+    "requested_steps_per_run": 1000000,
+    "actual_steps_per_run": 999424,
+    "parallel_environments": 16,
+    "steps_per_environment_per_rollout": 128,
+    "environment_steps_per_rollout": 2048,
+    "ppo_updates_per_run": 488,
+    "update_epochs": 4,
+    "recurrent_minibatches": 16,
+    "evaluation_episodes_per_run": 64,
+    "evaluation_policy": "stochastic categorical; held-out reset keys; four episodes from each of 16 environments",
+    "ib": {
+      "variant": "ib_reverse_prior20",
+      "divergence": "KL(posterior || prior)",
+      "posterior_memory_input": "output",
+      "prior_gradient_share": 0.2,
+      "prior_gradient_weight": 0.4,
+      "posterior_gradient_weight": 1.6,
+      "heads": "current input plus posterior mean/log variance, without latent sampling",
+      "current_input": "previous_action, previous_reward, current_observation",
+      "hidden": 512,
+      "layers": 2,
+      "latent_coordinates_per_branch": 1365,
+      "normalization": "fixed_calibration_rms_excess_above_one_bit",
+      "objective": "sum over actor/critic of sample mean(max(D_bits - 1, 0) / frozen_branch_RMS_bits), coefficient 1",
+      "calibration": "Fresh per task/mode/residual setting; 2048 random-policy samples, seed 900000; frozen scales specific to architecture. Do not reuse residual-enabled scales for the no-residual condition."
+    },
+    "vanilla_lru": "No Gaussian bottleneck, no added inter-layer residual, no RMS normalization, no weight decay or state dropout; heads receive current input plus projected LRU output.",
+    "training_settings": "Retain upstream PPO-RNN hyperparameters; only total budget increases relative to the short pilot. Initial runs start from scratch, not from 100K pilot checkpoints.",
+    "learning_rate_schedule": "Initial 1M runs anneal over the full requested 1M budget (488 complete updates).",
+    "preferred_accelerator": "Colab GPU. T4 and L4 returned HTTP 503; A100 allocation is pending. Record actual device per run.",
+    "rough_runtime_estimate_hours": [
+      18,
+      24
+    ],
+    "planned_output_directory": "results/ib_million_steps_20261109",
+    "planned_output_directory_created": true,
+    "remote_source_directory_suggestion": "/content/ib_million",
+    "layout": "Task/{mdp,pomdp}/{vanilla_lru,ib_residual,ib_no_residual}/{variant}_seed0/"
+  },
+  "checkpoint_plan_and_implementation": {
+    "module": "popgym_arcade/experiments/checkpoints.py",
+    "interval_requested_steps": 100000,
+    "rounding": "First complete 2048-step rollout crossing each threshold; additionally save final state at 999424 steps.",
+    "periodic_actual_steps": [
+      100352,
+      200704,
+      301056,
+      401408,
+      501760,
+      600064,
+      700416,
+      800768,
+      901120
+    ],
+    "final_actual_steps": 999424,
+    "expected_checkpoints_per_run": 10,
+    "expected_checkpoints_all_runs": 240,
+    "retention": "Keep ALL periodic and final checkpoints. No rolling deletion. Never remove remote copies before confirming local checksummed copies.",
+    "files": "Run/checkpoints/step_NNNNNNNNN/training_state.eqx and checkpoint.json; run/latest_checkpoint.json; final run/model.eqx",
+    "full_state_contents": [
+      "model parameters",
+      "optimizer moments and schedule counters",
+      "environment state",
+      "current observation",
+      "previous action and reward",
+      "done flags",
+      "recurrent memory",
+      "PRNG state"
+    ],
+    "sidecar_contents": [
+      "full run metadata including frozen RMS calibration",
+      "source/config fingerprint",
+      "completed updates and actual steps",
+      "elapsed time",
+      "state-file SHA-256 and byte count",
+      "final flag and intended threshold"
+    ],
+    "atomicity": "Write state and metadata into a hidden temporary directory, then rename to publish. Restore scans only completed step directories and verifies checksums.",
+    "same_budget_resume": "Automatic from newest compatible local checkpoint. Rebuild optimizer template, restore its state, trim training/gradient log tail after the durable checkpoint, continue global update counter.",
+    "future_extension_flags": [
+      "--resume-from RUN_OR_STEP_DIRECTORY",
+      "--extend-training",
+      "--timesteps NEW_TOTAL",
+      "--output FRESH_DIRECTORY"
+    ],
+    "extension_rules": "Exactly one variant and seed; original source run stays intact. Only explicitly opted-in budget/schedule changes are accepted. Reuse frozen RMS calibration from the source checkpoint metadata.",
+    "extension_schedule_policy": "Default LR horizon becomes the newly requested total budget while optimizer counters and moments continue. This can jump the LR relative to the old nearly-finished horizon; it is recorded in metadata. --schedule-timesteps OLD_TOTAL keeps the old horizon instead.",
+    "extension_compatibility": "Configuration/source fingerprints must otherwise match; use the frozen source snapshot for later reproducibility. Do not treat extension as a run trained from scratch under the longer schedule.",
+    "requires_for_practical_restore": "Preserve the full run directory, logs, calibration, source snapshot, dependency lock, and checkpoint sidecars, not just final model weights."
+  },
+  "gradient_logging": {
+    "cli_flag": "--gradient-log-interval 10000",
+    "output": "Run/gradient_norms.jsonl; gradient fields also appear in training.jsonl when enabled",
+    "per_sample_fields": [
+      "gradient_norm_pre_clip_mean",
+      "gradient_norm_pre_clip_max",
+      "gradient_norm_post_clip_mean",
+      "actor_gradient_norm_mean",
+      "critic_gradient_norm_mean",
+      "steps",
+      "update",
+      "sampled_rollout_steps",
+      "ppo_minibatches_in_sample",
+      "clip_threshold"
+    ],
+    "aggregation": "Mean/max across PPO minibatches and epochs of the sampled rollout (normally 64 minibatches from 2048 environment steps), not an average across the entire intervening 10K-step window.",
+    "cadence": "First completed rollout crossing each 10K threshold, plus final rollout; approximately 100 records per 1M run and ten per checkpoint interval.",
+    "clip_threshold": 0.5,
+    "complex_gradients": "Norm uses complex magnitudes as optax.global_norm does."
+  },
+  "implementation_completed": [
+    "Full-state atomic checkpoints and checksum-verified restore.",
+    "Run-signature validation and log trimming on restore.",
+    "Fresh-directory explicit budget extension with preserved optimizer/RNG and frozen RMS calibration.",
+    "Configurable learning-rate schedule horizon with continuation counters.",
+    "Pre/post clipping and actor/critic gradient metrics, optional 10K sampling log.",
+    "24-condition million_step_suite.py worker, progress status and incremental score report."
+  ],
+  "files_to_review": {
+    "popgym_arcade/experiments/checkpoints.py": {
+      "sha256": "51266bdebad9cc60d8375c0373b27653e4c877b70d12dbd5b672958441c61c9d",
+      "committed": false
+    },
+    "popgym_arcade/experiments/memory_bias.py": {
+      "sha256": "eaf74b4d8b1e51d1790512d030d78785ff0c8992db8899fc57440cc3521acb48",
+      "committed": false
+    },
+    "popgym_arcade/experiments/million_step_suite.py": {
+      "sha256": "f0ce975193869e7de299b3e0bd1a56e9fb8a6470ea51dd154914a34db612a64f",
+      "committed": false
+    },
+    "tests/test_experiment_checkpoints.py": {
+      "sha256": "b22c18c21b69d5926daa27b90e25fe0b91ae76a4c0a36cc0423cfacc1e89d903",
+      "committed": false
+    },
+    "docs/experiment_handoff/checkpoint_extension_smoke.py": {
+      "sha256": "5a12399626571b4730b4f9e4cf1467738a404daf901497a72525ff2530207567",
+      "committed": false
+    }
+  },
+  "validation": {
+    "focused_tests": {
+      "command": "UV_CACHE_DIR=/tmp/uv-cache JAX_PLATFORMS=cpu uv run --no-sync pytest -q tests/test_colab_million_sync.py tests/test_experiment_checkpoints.py tests/test_memory_bias.py",
+      "result": "76 passed",
+      "seconds": 45.78
+    },
+    "covered": [
+      "exact optimizer/RNG/recurrent toy continuation equivalence",
+      "real IB model and actual wrapped environment Runner serialization",
+      "corrupt/incomplete checkpoint rejection",
+      "configuration mismatch rejection",
+      "explicit budget extension opt-in",
+      "10^5 checkpoint cadence",
+      "complex gradient norms and clipping",
+      "existing numerical IB/replay/reset/evaluation invariants"
+    ],
+    "warnings": [
+      "optax.global_norm deprecation (optax.tree.norm is preferred by the installed version)",
+      "existing complex-to-real gradient cast warning"
+    ],
+    "real_ppo_cpu_smoke": {
+      "result": "PASS (rerun after fresh-destination and schedule review)",
+      "preserved_script": "docs/experiment_handoff/checkpoint_extension_smoke.py",
+      "command": "JAX_PLATFORMS=cpu uv run python docs/experiment_handoff/checkpoint_extension_smoke.py",
+      "setup": "Tiny hidden=6 model, 2 environments, 4 rollout steps, one PPO epoch, two minibatches. Train 16 steps, save full state, restore into fresh output and extend to 24 total steps.",
+      "verified": [
+        "actual PPO updates",
+        "periodic/final checkpoints",
+        "complex optimizer state serialization",
+        "reuse of frozen calibration",
+        "gradient norms and clipping",
+        "preserved original run",
+        "extension log steps [8,16,24]"
+      ],
+      "evaluation_mocked": true,
+      "evaluation_mock_reason": "Only validates training/checkpoint/extension plumbing; fixed evaluation values are not scientific scores.",
+      "temporary_artifacts_deleted": true
+    },
+    "lint": "Ruff check passed for checkpoint/training/suite/supervisor/remote/smoke/test files.",
+    "gpu_validation_for_new_checkpoint_features": "NOT RUN; Colab allocation failed/cancelled. Do not claim that the 1M suite has run.",
+    "colab_sync_recovery": "Three CPU tests passed: incremental checkpoint transfer without retransmission, corrupt checkpoint rejection before publication, and expired-runtime recovery packaging with latest full state/logs/frozen calibration."
+  },
+  "remaining_work_after_explicit_resume_authorization": [
+    "Allocate Colab GPU; T4/L4 returned HTTP 503, final A100 attempt pending.",
+    "Run full-size real CUDA checkpoint/interruption/resume/extension smoke.",
+    "Launch sequential 24-run queue from frozen source and verify first official checkpoint locally.",
+    "Monitor and sync all checkpoints; recover runtime expiration from latest verified state.",
+    "Complete score comparisons and learning/gradient plots, then release Colab after all artifacts are verified."
+  ],
+  "commands_for_future_reference_not_authorization": {
+    "worker": "JAX_PLATFORMS=cuda XLA_PYTHON_CLIENT_PREALLOCATE=false MPLBACKEND=Agg uv run python -m popgym_arcade.experiments.million_step_suite --output results/ib_million_steps_20261109",
+    "report_only": "JAX_PLATFORMS=cpu uv run python -m popgym_arcade.experiments.million_step_suite --output results/ib_million_steps_20261109 --report-only",
+    "one_ib_residual_run": "uv run python -m popgym_arcade.experiments.memory_bias --env CartPoleHard --variants ib_reverse_prior20 --posterior-input output --lru-residual --ib-normalization fixed_rms --timesteps 1000000 --seeds 0 --eval-episodes 64 --checkpoint-interval 100000 --gradient-log-interval 10000 --output FRESH_DIRECTORY",
+    "one_ib_no_residual_run": "Same command with --no-lru-residual. Add --partial-obs for POMDP.",
+    "one_lru_run": "uv run python -m popgym_arcade.experiments.memory_bias --env CartPoleHard --variants lru --no-lru-residual --ib-coefficient 0 --ib-normalization none --timesteps 1000000 --seeds 0 --eval-episodes 64 --checkpoint-interval 100000 --gradient-log-interval 10000 --output FRESH_DIRECTORY",
+    "future_extension_example": "uv run python -m popgym_arcade.experiments.memory_bias --env CartPoleHard --variants ib_reverse_prior20 --posterior-input output --lru-residual --ib-normalization fixed_rms --resume-from ORIGINAL_RUN_DIRECTORY --extend-training --timesteps 10000000 --checkpoint-interval 100000 --gradient-log-interval 10000 --seeds 0 --eval-episodes 64 --output FRESH_EXTENSION_DIRECTORY"
+  },
+  "existing_reference_results": {
+    "all_128_corrected_pilot_runs": "results/posterior_rms_suite_20261109",
+    "all_8_vanilla_baselines": "results/vanilla_lru_baselines_20261109",
+    "all_8_default_ib_no_residual_runs": "results/default_ib_no_residual_20261109",
+    "pilot_budget": "100000 requested / 98304 actual per run; seed 0; 64 evaluation episodes",
+    "prior_findings": "Default residual-enabled reverse-KL/output/prior20 passes LRU mean minus LRU episode SE in 6/8 cells; no-residual version passes 3/8 and lowers the mean in 6/8. These single-seed results motivated the 1M comparison, not a claim of seed-level reproducibility."
+  },
+  "jobs": [
+    {
+      "task": "CartPoleHard",
+      "mode": "mdp",
+      "condition": "vanilla_lru",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "CartPoleHard",
+      "mode": "mdp",
+      "condition": "ib_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "CartPoleHard",
+      "mode": "mdp",
+      "condition": "ib_no_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "CartPoleHard",
+      "mode": "pomdp",
+      "condition": "vanilla_lru",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "CartPoleHard",
+      "mode": "pomdp",
+      "condition": "ib_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "CartPoleHard",
+      "mode": "pomdp",
+      "condition": "ib_no_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "NavigatorEasy",
+      "mode": "mdp",
+      "condition": "vanilla_lru",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "NavigatorEasy",
+      "mode": "mdp",
+      "condition": "ib_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "NavigatorEasy",
+      "mode": "mdp",
+      "condition": "ib_no_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "NavigatorEasy",
+      "mode": "pomdp",
+      "condition": "vanilla_lru",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "NavigatorEasy",
+      "mode": "pomdp",
+      "condition": "ib_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "NavigatorEasy",
+      "mode": "pomdp",
+      "condition": "ib_no_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "MineSweeperEasy",
+      "mode": "mdp",
+      "condition": "vanilla_lru",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "MineSweeperEasy",
+      "mode": "mdp",
+      "condition": "ib_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "MineSweeperEasy",
+      "mode": "mdp",
+      "condition": "ib_no_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "MineSweeperEasy",
+      "mode": "pomdp",
+      "condition": "vanilla_lru",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "MineSweeperEasy",
+      "mode": "pomdp",
+      "condition": "ib_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "MineSweeperEasy",
+      "mode": "pomdp",
+      "condition": "ib_no_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "BreakoutEasy",
+      "mode": "mdp",
+      "condition": "vanilla_lru",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "BreakoutEasy",
+      "mode": "mdp",
+      "condition": "ib_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "BreakoutEasy",
+      "mode": "mdp",
+      "condition": "ib_no_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "BreakoutEasy",
+      "mode": "pomdp",
+      "condition": "vanilla_lru",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "BreakoutEasy",
+      "mode": "pomdp",
+      "condition": "ib_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    },
+    {
+      "task": "BreakoutEasy",
+      "mode": "pomdp",
+      "condition": "ib_no_residual",
+      "status": "not_started",
+      "checkpoints_saved": 0
+    }
+  ],
+  "status_history": [
+    {
+      "phase": "stopped_by_user_before_official_training",
+      "official_runs_started": 0,
+      "official_runs_completed": 0,
+      "official_training_steps_collected": 0,
+      "latest_user_instruction": "stop all the colab; write task progress state JSON for a new Codex session",
+      "do_not_start_colab_without_explicit_user_resume": true,
+      "resume_policy": "Continue code review or read-only inspection as needed, but do not allocate a Colab runtime or start official training unless the user explicitly authorizes resuming this stopped experiment.",
+      "colab_at_last_verification": {
+        "active_assignments": 0,
+        "compute_units_per_hour": 0.0,
+        "remaining_compute_units": 287.64,
+        "requested_session_name": "ib-million-t4",
+        "first_allocation": "Failed with HTTP 503 Service Unavailable after CLI retries.",
+        "second_allocation": "Pending allocation process was terminated at user request. No session was created.",
+        "official_training_never_started": true,
+        "allocation_processes_running": false,
+        "sync_or_supervisor_running": false
+      },
+      "important_distinction": "Only CPU implementation tests/smoke checks ran. Their tiny mocked evaluation scores are not experiment results."
+    }
+  ],
+  "review_followups": [
+    "Completed-run reuse now validates an overridden learning-rate horizon.",
+    "Extension metadata now distinguishes preserved and changed schedule horizons.",
+    "Colab device labels now report actual accelerator rather than assuming T4.",
+    "External resume rejects populated destinations unless retrying the same extension with identical settings."
+  ]
+}

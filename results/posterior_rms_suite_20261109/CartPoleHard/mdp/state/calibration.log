@@ -1,0 +1,26 @@
+2026-11-09 13:13:40.996319: W external/xla/xla/tsl/framework/bfc_allocator.cc:310] Allocator (GPU_0_bfc) ran out of memory trying to allocate 1.89GiB with freed_by_count=0. The caller indicates that this is not a failure, but this may mean that there could be performance gains if more memory were available.
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/user/popgym_arcade/popgym_arcade/experiments/calibrate_divergences.py", line 124, in <module>
+    main()
+  File "/home/user/popgym_arcade/popgym_arcade/experiments/calibrate_divergences.py", line 120, in main
+    calibrate(args.env, args.partial_obs, args.posterior_input, args.seed, args.output)
+  File "/home/user/popgym_arcade/popgym_arcade/experiments/calibrate_divergences.py", line 80, in calibrate
+    values = np.asarray(replay(model, batch), dtype=np.float64) / np.log(2.0)
+                        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/popgym_arcade/.venv/lib/python3.12/site-packages/equinox/_jit.py", line 209, in __call__
+    return _call(self, False, args, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/popgym_arcade/.venv/lib/python3.12/site-packages/equinox/_jit.py", line 263, in _call
+    marker, _, _ = out = jit_wrapper._cached(
+                         ^^^^^^^^^^^^^^^^^^^^
+jaxlib._jax.XlaRuntimeError: UNKNOWN: Failed to determine best cudnn convolution algorithm for:
+%cudnn-conv-bias-activation.24 = (f32[2048,64,62,62]{3,2,1,0}, u8[0]{0}) custom-call(%bitcast.60, %Arg_0.1, %bitcast.62), window={size=5x5 stride=2x2}, dim_labels=bf01_oi01->bf01, custom_call_target="__cudnn$convBiasActivationForward", metadata={op_name="jit(<lambda>)/jit(main)/vmap(eqx.nn.Sequential)/eqx.nn.Conv/conv_general_dilated" source_file="/home/user/popgym_arcade/.venv/lib/python3.12/site-packages/equinox/nn/_conv.py" source_line=239}, backend_config={"operation_queue_id":"0","wait_on_operation_queues":[],"cudnn_conv_backend_config":{"conv_result_scale":1,"activation_mode":"kNone","side_input_scale":0,"leakyrelu_alpha":0},"force_earliest_schedule":false,"reification_cost":[]}
+
+Original error: RESOURCE_EXHAUSTED: Out of memory while trying to allocate 2032140288 bytes. [tf-allocator-allocation-error='']
+
+To ignore this failure and try to use a fallback algorithm (which may have suboptimal performance), use XLA_FLAGS=--xla_gpu_strict_conv_algorithm_picker=false.  Please also file a bug for the root cause of failing autotuning.
+--------------------
+For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+{"env": "CartPoleHard", "partial_obs": false, "posterior_input": "state", "seed": 0, "residual": true, "hidden": 512, "layers": 2, "samples": 2048, "policy": "uniform_random_5_actions", "calibration_seed": 900000, "batch_sha256": "bda9662a4bfeebf37e93b74111706cf35728553d04d103d0bc1c3448e74f3ba3", "scales_bits": {"forward_kl": [3.3848011555023465, 3.3976493494397095], "reverse_kl": [3.387826820508601, 3.3934780159048414], "symmetric_kl": [3.3863128376724037, 3.3955622265702865], "renyi_half": [1.6920443500620082, 1.6966877857698692]}, "raw": {"forward_kl": {"mean_bits": [3.3706626703889437, 3.3846701798147305], "max_bits": [3.6401149632059573, 3.583642052038042]}, "reverse_kl": {"mean_bits": [3.373691972801241, 3.380497028937207], "max_bits": [3.636072682980078, 3.5782084321666825]}, "symmetric_kl": {"mean_bits": [3.3721773247861764, 3.3825836028224145], "max_bits": [3.6380938230930178, 3.5782744735046137]}, "renyi_half": {"mean_bits": [1.6849859458293703, 1.6902072977514326], "max_bits": [1.8178414851466114, 1.7879959598811812]}}, "minimum_scale_bits": 1e-08}

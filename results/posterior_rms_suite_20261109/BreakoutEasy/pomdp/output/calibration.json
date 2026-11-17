@@ -1,0 +1,74 @@
+{
+  "env": "BreakoutEasy",
+  "partial_obs": true,
+  "posterior_input": "output",
+  "seed": 0,
+  "residual": true,
+  "hidden": 512,
+  "layers": 2,
+  "samples": 2048,
+  "policy": "uniform_random_5_actions",
+  "calibration_seed": 900000,
+  "batch_sha256": "207dd62ba6091bbb81dfaf9ab07243b99635acfa4e5b35bdd5ea09eeb3ff6390",
+  "scales_bits": {
+    "forward_kl": [
+      5.4202305445623615,
+      5.679686643765859
+    ],
+    "reverse_kl": [
+      5.434540294831437,
+      5.665217323336515
+    ],
+    "symmetric_kl": [
+      5.427383310033545,
+      5.672450804170834
+    ],
+    "renyi_half": [
+      2.710698377460509,
+      2.8331279380862946
+    ]
+  },
+  "raw": {
+    "forward_kl": {
+      "mean_bits": [
+        5.403693577482096,
+        5.660941638268342
+      ],
+      "max_bits": [
+        5.950548812988523,
+        6.1529510672053425
+      ]
+    },
+    "reverse_kl": {
+      "mean_bits": [
+        5.417903575989154,
+        5.646623121395819
+      ],
+      "max_bits": [
+        5.960559579129946,
+        6.137046799584153
+      ]
+    },
+    "symmetric_kl": {
+      "mean_bits": [
+        5.410798572788757,
+        5.653782379832081
+      ],
+      "max_bits": [
+        5.955554196059235,
+        6.14499927736005
+      ]
+    },
+    "renyi_half": {
+      "mean_bits": [
+        2.7024254144187316,
+        2.823816024315842
+      ],
+      "max_bits": [
+        2.974136225310852,
+        3.0689162081666472
+      ]
+    }
+  },
+  "minimum_scale_bits": 1e-08
+}

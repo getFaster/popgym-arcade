@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "popgym-arcade"
+version = "0.0.7"
+description = "POMDP Arcade Environments on the GPU"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT License" }
+authors = [ { name = "Wang Zekang, He Zhe, Steven Morad" } ]
+
+dependencies = [
+  "stable-gymnax",
+  "dm_pix",
+  "jaxtyping",
+  "six",
+]
+
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+[project.scripts]
+popgym-arcade-play = "popgym_arcade.play:main"
+
+[project.optional-dependencies]
+cuda = ["jax[cuda12]==0.6.2"]
+human = ["pygame-ce"]
+baselines = [
+  "memax[equinox]",
+  "optax",
+  "equinox",
+  "distreqx",
+  "wandb[media]",
+  "beartype",
+  "jaxtyping",
+  "imageio",
+]
+tests = ["pytest"]
+
+# Combined extras for convenience: install with `pip install popgym-arcade[all]`
+all = [
+  # Human
+  "pygame-ce",
+  # Baselines
+  "memax[equinox]",
+  "optax",
+  "equinox",
+  "distreqx",
+  "wandb[media]",
+  "beartype",
+  "jaxtyping",
+  "imageio",
+  # Test
+  "pytest",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[dependency-groups]
+dev = ["ruff", "pytest"]
+
+[tool.uv]
+constraint-dependencies = [
+  "nvidia-cuda-runtime-cu12==12.8.90",
+  "nvidia-cuda-cupti-cu12==12.8.90",
+  "nvidia-nccl-cu12==2.28.9",
+  "nvidia-cufft-cu12==11.3.3.83",
+  "nvidia-cuda-nvrtc-cu12==12.8.93",
+  "nvidia-nvshmem-cu12==3.4.5",
+  "nvidia-cusparse-cu12==12.5.8.93",
+  "nvidia-cublas-cu12==12.8.4.1",
+  "nvidia-cudnn-cu12==9.19.0.56",
+  "nvidia-cusolver-cu12==11.7.3.90",
+  "nvidia-nvjitlink-cu12==12.8.93",
+]

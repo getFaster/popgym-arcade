@@ -1,0 +1,87 @@
+{
+  "references": [
+    {
+      "task": "CartPoleHard",
+      "mode": "mdp",
+      "result_path": "results/vanilla_lru_baselines_20261109/CartPoleHard/mdp/lru_seed0/result.json",
+      "result_sha256": "feec8fe611a2e98772021fcbf76480ea693134f15230464c6954e773c6f555ff",
+      "source_sha256": {
+        "memory_bias.py": "83a862636966234f22a6c758432066fcbe694ec393afb8bd067ea4b192ceaec5",
+        "memory_models.py": "55bc63f3a92182fbb49176d68ae6d6562ec9dbd3645c169f0bd127fe9ce29faf",
+        "uv.lock": "b69e580fd829cad42f78b217800db80138de4fbf72728bc61d2d3b68e65a46a7"
+      },
+      "reused_from": "/home/user/popgym_arcade/results/memory_bias_pilot/lru_seed0",
+      "evaluation_recovered_from_checkpoint": false,
+      "evaluation_code_sha256": null,
+      "baseline_interlayer_residual": false,
+      "baseline_parameters": 6940422
+    },
+    {
+      "task": "NavigatorEasy",
+      "mode": "mdp",
+      "result_path": "results/vanilla_lru_baselines_20261109/NavigatorEasy/mdp/lru_seed0/result.json",
+      "result_sha256": "b0c02253076e2b0500ee5586fd9d6a1e228da87a6bff1e903230d5cf8657cb7b",
+      "source_sha256": {
+        "memory_bias.py": "2b4457b5cac7e33decdf24b615d6ac27372d0cdf213e863e2fcdd82c706b0ea1",
+        "memory_models.py": "ed585831329285db85a167cd1cb890ef7a094cd9a211f0c3a5472af9ea35caf6",
+        "uv.lock": "b69e580fd829cad42f78b217800db80138de4fbf72728bc61d2d3b68e65a46a7"
+      },
+      "reused_from": null,
+      "evaluation_recovered_from_checkpoint": false,
+      "evaluation_code_sha256": null,
+      "baseline_interlayer_residual": false,
+      "baseline_parameters": 6940422
+    },
+    {
+      "task": "MineSweeperEasy",
+      "mode": "mdp",
+      "result_path": "results/vanilla_lru_baselines_20261109/MineSweeperEasy/mdp/lru_seed0/result.json",
+      "result_sha256": "aa109cb8328c314dce3705b48fb40dad2e3162ca421cef5a3dfd6e62ba57b5fa",
+      "source_sha256": {
+        "memory_bias.py": "2b4457b5cac7e33decdf24b615d6ac27372d0cdf213e863e2fcdd82c706b0ea1",
+        "memory_models.py": "ed585831329285db85a167cd1cb890ef7a094cd9a211f0c3a5472af9ea35caf6",
+        "uv.lock": "b69e580fd829cad42f78b217800db80138de4fbf72728bc61d2d3b68e65a46a7"
+      },
+      "reused_from": null,
+      "evaluation_recovered_from_checkpoint": true,
+      "evaluation_code_sha256": "f34ac3013104919e04909aa28e0dd5a909f70b7f48b333a64294d67d5658a1d2",
+      "baseline_interlayer_residual": false,
+      "baseline_parameters": 6940422
+    },
+    {
+      "task": "BreakoutEasy",
+      "mode": "mdp",
+      "result_path": "results/vanilla_lru_baselines_20261109/BreakoutEasy/mdp/lru_seed0/result.json",
+      "result_sha256": "a24932a3c66b981a0bc147ba809f63255fb678edad5b198e22ea1b0b9c8676f5",
+      "source_sha256": {
+        "memory_bias.py": "f34ac3013104919e04909aa28e0dd5a909f70b7f48b333a64294d67d5658a1d2",
+        "memory_models.py": "ed585831329285db85a167cd1cb890ef7a094cd9a211f0c3a5472af9ea35caf6",
+        "uv.lock": "b69e580fd829cad42f78b217800db80138de4fbf72728bc61d2d3b68e65a46a7"
+      },
+      "reused_from": null,
+      "evaluation_recovered_from_checkpoint": false,
+      "evaluation_code_sha256": null,
+      "baseline_interlayer_residual": false,
+      "baseline_parameters": 6940422
+    }
+  ],
+  "matched": [
+    "fully observed task",
+    "PPO configuration",
+    "seed 0",
+    "98304 training steps",
+    "64 evaluation episodes",
+    "hidden/layers",
+    "JAX and dependency lock",
+    "local GPU"
+  ],
+  "limitations": [
+    "POMDP baselines were run separately; consult the consolidated archive for provenance",
+    "Historical vanilla LRU has no added inter-layer residual; all corrected IB runs enable it",
+    "LRU head and posterior-statistics head differ in architecture and parameter count",
+    "Training code hashes differ and are retained",
+    "Single training seed; highest-scoring configurations selected after evaluation",
+    "CartPole reference is a copy of the initial pilot, not a second training seed",
+    "MineSweeper baseline evaluation was recovered from its completed checkpoint"
+  ]
+}

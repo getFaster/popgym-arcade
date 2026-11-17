@@ -83,3 +83,32 @@ The full-size CUDA replay check (512 states × 2 layers × 128 timesteps) can be
 ```bash
 JAX_PLATFORMS=cuda XLA_PYTHON_CLIENT_PREALLOCATE=false uv run python tests/check_lru_cuda.py
 ```
+
+## Action-conditioned LRU prediction auxiliary
+
+`--variants lru lru_prediction` compares vanilla LRU with linear prediction
+heads on `(input_t, final activated LRU output)` of each actor/critic branch.
+`ib_reverse_prior20_prediction` adds the same targets to the default IB,
+with prediction inputs `(input_t, posterior_mean, posterior_log_variance)`;
+its reverse KL, 0.4/1.6 balancing, residuals, one-bit free region and frozen
+RMS normalization match `ib_reverse_prior20`. Each head
+outputs `[5, 513]`: a 512-dimensional next CNN embedding plus scalar next reward
+for each action. Only the executed action is supervised. Embedding MSE averages
+over coordinates and nonterminal transitions; reward MSE includes terminal
+rewards. The two losses sum across branches with
+`--prediction-coefficient 1` by default. Episode-end next images are auto-reset
+observations and are excluded. Both current and target CNN paths have stopped
+auxiliary gradients; PPO continues to train the CNN normally. No divergence,
+free-bit floor, or RMS scaling applies to the prediction MSE itself. Shared parameter initialization and RL
+heads match vanilla LRU; auxiliary heads add parameters. Use a fresh output
+directory and compare evaluation returns across training seeds before claiming
+a reliable benefit. The first pilot is documented under
+`results/lru_input_prediction_20261111/EXPERIMENT.md`.
+
+`mlp_prediction` adds the same selected-action next-embedding/reward losses to
+plain MLP, with linear prediction heads on each shared 256-dimensional MLP
+hidden layer. Auxiliary replay blocks both CNN paths but trains the MLP trunk;
+PPO output layers are unchanged. The shared trunk and CNN initialize identically
+to plain MLP. Compare both modes with fresh output directories. In addition to
+plain-MLP-relative bias, the pilot report uses MLP-plus-prediction as a matched
+reference for LRU/IB prediction variants.

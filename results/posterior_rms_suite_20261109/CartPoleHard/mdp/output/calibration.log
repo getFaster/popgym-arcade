@@ -1,0 +1,29 @@
+2026-11-09 13:13:19.743817: E external/xla/xla/service/slow_operation_alarm.cc:73] Trying algorithm eng18{k2=1,k4=1,k5=1,k6=0,k7=0} for conv %cudnn-conv-bias-activation.24 = (f32[2048,64,62,62]{3,2,1,0}, u8[0]{0}) custom-call(%bitcast.58, %Arg_0.1, %bitcast.60), window={size=5x5 stride=2x2}, dim_labels=bf01_oi01->bf01, custom_call_target="__cudnn$convBiasActivationForward", metadata={op_name="jit(<lambda>)/jit(main)/vmap(eqx.nn.Sequential)/eqx.nn.Conv/conv_general_dilated" source_file="/home/user/popgym_arcade/.venv/lib/python3.12/site-packages/equinox/nn/_conv.py" source_line=239}, backend_config={"operation_queue_id":"0","wait_on_operation_queues":[],"cudnn_conv_backend_config":{"conv_result_scale":1,"activation_mode":"kNone","side_input_scale":0,"leakyrelu_alpha":0},"force_earliest_schedule":false,"reification_cost":[]} is taking a while...
+2026-11-09 13:13:20.484913: W external/xla/xla/tsl/framework/bfc_allocator.cc:310] Allocator (GPU_0_bfc) ran out of memory trying to allocate 1.89GiB with freed_by_count=0. The caller indicates that this is not a failure, but this may mean that there could be performance gains if more memory were available.
+2026-11-09 13:13:20.485038: E external/xla/xla/service/slow_operation_alarm.cc:140] The operation took 1.741409168s
+Trying algorithm eng18{k2=1,k4=1,k5=1,k6=0,k7=0} for conv %cudnn-conv-bias-activation.24 = (f32[2048,64,62,62]{3,2,1,0}, u8[0]{0}) custom-call(%bitcast.58, %Arg_0.1, %bitcast.60), window={size=5x5 stride=2x2}, dim_labels=bf01_oi01->bf01, custom_call_target="__cudnn$convBiasActivationForward", metadata={op_name="jit(<lambda>)/jit(main)/vmap(eqx.nn.Sequential)/eqx.nn.Conv/conv_general_dilated" source_file="/home/user/popgym_arcade/.venv/lib/python3.12/site-packages/equinox/nn/_conv.py" source_line=239}, backend_config={"operation_queue_id":"0","wait_on_operation_queues":[],"cudnn_conv_backend_config":{"conv_result_scale":1,"activation_mode":"kNone","side_input_scale":0,"leakyrelu_alpha":0},"force_earliest_schedule":false,"reification_cost":[]} is taking a while...
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/user/popgym_arcade/popgym_arcade/experiments/calibrate_divergences.py", line 124, in <module>
+    main()
+  File "/home/user/popgym_arcade/popgym_arcade/experiments/calibrate_divergences.py", line 120, in main
+    calibrate(args.env, args.partial_obs, args.posterior_input, args.seed, args.output)
+  File "/home/user/popgym_arcade/popgym_arcade/experiments/calibrate_divergences.py", line 80, in calibrate
+    values = np.asarray(replay(model, batch), dtype=np.float64) / np.log(2.0)
+                        ^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/popgym_arcade/.venv/lib/python3.12/site-packages/equinox/_jit.py", line 209, in __call__
+    return _call(self, False, args, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/popgym_arcade/.venv/lib/python3.12/site-packages/equinox/_jit.py", line 263, in _call
+    marker, _, _ = out = jit_wrapper._cached(
+                         ^^^^^^^^^^^^^^^^^^^^
+jaxlib._jax.XlaRuntimeError: UNKNOWN: Failed to determine best cudnn convolution algorithm for:
+%cudnn-conv-bias-activation.24 = (f32[2048,64,62,62]{3,2,1,0}, u8[0]{0}) custom-call(%bitcast.58, %Arg_0.1, %bitcast.60), window={size=5x5 stride=2x2}, dim_labels=bf01_oi01->bf01, custom_call_target="__cudnn$convBiasActivationForward", metadata={op_name="jit(<lambda>)/jit(main)/vmap(eqx.nn.Sequential)/eqx.nn.Conv/conv_general_dilated" source_file="/home/user/popgym_arcade/.venv/lib/python3.12/site-packages/equinox/nn/_conv.py" source_line=239}, backend_config={"operation_queue_id":"0","wait_on_operation_queues":[],"cudnn_conv_backend_config":{"conv_result_scale":1,"activation_mode":"kNone","side_input_scale":0,"leakyrelu_alpha":0},"force_earliest_schedule":false,"reification_cost":[]}
+
+Original error: RESOURCE_EXHAUSTED: Out of memory while trying to allocate 2032140288 bytes. [tf-allocator-allocation-error='']
+
+To ignore this failure and try to use a fallback algorithm (which may have suboptimal performance), use XLA_FLAGS=--xla_gpu_strict_conv_algorithm_picker=false.  Please also file a bug for the root cause of failing autotuning.
+--------------------
+For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+{"env": "CartPoleHard", "partial_obs": false, "posterior_input": "output", "seed": 0, "residual": true, "hidden": 512, "layers": 2, "samples": 2048, "policy": "uniform_random_5_actions", "calibration_seed": 900000, "batch_sha256": "bda9662a4bfeebf37e93b74111706cf35728553d04d103d0bc1c3448e74f3ba3", "scales_bits": {"forward_kl": [5.298982942117758, 5.456675708189641], "reverse_kl": [5.312852475283186, 5.4435899223663], "symmetric_kl": [5.305915355684174, 5.450131764529839], "renyi_half": [2.650102403039933, 2.722185342842962]}, "raw": {"forward_kl": {"mean_bits": [5.27031253623171, 5.425659800818368], "max_bits": [5.918650846767696, 5.9624678986239195]}, "reverse_kl": {"mean_bits": [5.284052427888417, 5.412710826721773], "max_bits": [5.929507767551364, 5.939244049382009]}, "symmetric_kl": {"mean_bits": [5.277182485922955, 5.41918531439989], "max_bits": [5.924079307159531, 5.950855630037663]}, "renyi_half": {"mean_bits": [2.6357680458847934, 2.706746051084309], "max_bits": [2.958459318754103, 2.971925904281963]}}, "minimum_scale_bits": 1e-08}
