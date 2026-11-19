@@ -1,0 +1,26 @@
+{
+  "runs": 36,
+  "modes": [
+    "activation",
+    "state_activation"
+  ],
+  "levels": [
+    3,
+    5,
+    7
+  ],
+  "scale": 1.0,
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "observations": [
+    "mdp",
+    "pomdp"
+  ],
+  "requested_steps": 100000,
+  "reference": "results/fsq_lru_local_20261117_1420",
+  "gap_definition": "MLP minus LRU variant return on full observation MDP",
+  "git_head": "8f8f65c712e48ab6a478d7d8dc2d8fbc1baeb54f"
+}

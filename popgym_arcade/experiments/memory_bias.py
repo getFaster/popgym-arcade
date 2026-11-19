@@ -41,7 +41,9 @@ from popgym_arcade.experiments.memory_models import (
     VARIANTS,
     MemoryActorCritic,
     free_bit,
+    fsq,
     fsq_diagnostics,
+    fsq_metric_names,
     normalized_excess,
     prediction_losses,
     resolve_memory_options,
@@ -183,7 +185,7 @@ def build_update(
             batch, traces = batch
             diagnostics = []
             cell = network.actor.cells[0]
-            for raw, previous in traces:
+            for raw, previous, activated in traces:
                 # Flatten layers/features together; retain rollout time and env axes.
                 shape = raw.shape[:2] + (-1,)
                 stats = fsq_diagnostics(
@@ -193,7 +195,23 @@ def build_update(
                     cell.scale,
                     (~batch.done)[..., None],
                 )
-                diagnostics.extend(stats.values())
+                if cell.quantization != "activation":
+                    diagnostics.extend(stats.values())
+                if cell.quantization in ("activation", "state_activation"):
+                    activated = activated.reshape(shape)
+                    previous_output = jnp.concatenate(
+                        (
+                            jnp.zeros_like(activated[:1]),
+                            fsq(activated[:-1], cell.levels, cell.scale),
+                        ),
+                        axis=0,
+                    )
+                    valid = (~batch.done).at[0].set(False)[..., None]
+                    diagnostics.extend(
+                        fsq_diagnostics(
+                            activated, previous_output, cell.levels, cell.scale, valid
+                        ).values()
+                    )
         _, _, last_value, _ = network.step(
             runner.memory,
             runner.obs,
@@ -997,19 +1015,8 @@ def run_one(args, variant, seed, config):
                 "training_return": float(return_sum) / completed if completed else None,
             }
             if network.actor.cells and network.actor.cells[0].quantization != "none":
-                names = [
-                    f"fsq_{branch}_{component}_{metric}"
-                    for branch in ("actor", "critic")
-                    for component in ("real", "imag")
-                    for metric in (
-                        "error",
-                        "saturation",
-                        "utilization",
-                        "entropy_nats",
-                        "change",
-                    )
-                ]
-                record.update(zip(names, map(float, metrics[-20:])))
+                names = fsq_metric_names(network.actor.cells[0].quantization)
+                record.update(zip(names, map(float, metrics[-len(names) :])))
             if variant.endswith("_prediction"):
                 record["prediction_observation_mse"] = float(metrics[7])
                 record["prediction_reward_mse"] = float(metrics[8])
@@ -1103,7 +1110,7 @@ def build_parser(defaults=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--recurrent-state-quantization",
-        choices=("none", "fsq", "output"),
+        choices=("none", "fsq", "output", "activation", "state_activation"),
         default="none",
     )
     parser.add_argument("--fsq-levels", type=int, default=5)

@@ -160,8 +160,14 @@ class LRUCell(eqx.Module):
     def __init__(
         self, input_size, hidden_size, key, quantization="none", levels=5, scale=1.0
     ):
-        if quantization not in ("none", "fsq", "output"):
-            raise ValueError("quantization must be none, fsq, or output")
+        if quantization not in (
+            "none",
+            "fsq",
+            "output",
+            "activation",
+            "state_activation",
+        ):
+            raise ValueError("unknown quantization mode")
         fsq(jnp.zeros(()), levels, scale)
         self.quantization, self.levels, self.scale = quantization, levels, scale
         keys = jax.random.split(key, 7)
@@ -191,7 +197,7 @@ class LRUCell(eqx.Module):
         eigenvalue = jnp.exp(-jnp.exp(self.nu) + 1j * jnp.exp(self.theta))
         b = jnp.exp(self.gamma)[:, None] * (self.b_real + 1j * self.b_imag)
         state = eigenvalue * (state * mask) + b @ x
-        if self.quantization == "fsq":
+        if self.quantization in ("fsq", "state_activation"):
             state = fsq(state, self.levels, self.scale)
         readout = (
             fsq(state, self.levels, self.scale)
@@ -199,7 +205,10 @@ class LRUCell(eqx.Module):
             else state
         )
         output = jnp.real((self.c_real + 1j * self.c_imag) @ readout) + self.skip @ x
-        return state, jax.nn.leaky_relu(output)
+        output = jax.nn.leaky_relu(output)
+        if self.quantization in ("activation", "state_activation"):
+            output = fsq(output, self.levels, self.scale)
+        return state, output
 
 
 class Branch(eqx.Module):
@@ -370,7 +379,7 @@ class Branch(eqx.Module):
     def quantization_trace(self, state, x, done):
         """Pre-quantization updates and previous readout codes for diagnostics."""
         state = jnp.where(done, jnp.zeros_like(state), state)
-        raw, previous = [], []
+        raw, previous, activated = [], [], []
         y = x
         for i, cell in enumerate(self.cells):
             eigenvalue = jnp.exp(-jnp.exp(cell.nu) + 1j * jnp.exp(cell.theta))
@@ -378,18 +387,25 @@ class Branch(eqx.Module):
             raw.append(eigenvalue * state[i] + b @ y)
             previous.append(
                 state[i]
-                if cell.quantization == "fsq"
+                if cell.quantization in ("fsq", "state_activation")
                 else fsq(state[i], cell.levels, cell.scale)
             )
             old_y = y
-            _, y = cell(state[i], y, jnp.ones_like(state[i].real))
+            next_state, output = cell(state[i], y, jnp.ones_like(state[i].real))
+            activated.append(
+                jax.nn.leaky_relu(
+                    jnp.real((cell.c_real + 1j * cell.c_imag) @ next_state)
+                    + cell.skip @ y
+                )
+            )
+            y = output
             if self.residual and i > 0:
                 y = y + old_y
-        return jnp.stack(raw), jnp.stack(previous)
+        return jnp.stack(raw), jnp.stack(previous), jnp.stack(activated)
 
     def parallel_sequence(self, initial_state, inputs, done, keys, training):
         """Associative affine scan: same recurrence and reset/dropout masks as step."""
-        if self.cells[0].quantization == "fsq":
+        if self.cells[0].quantization in ("fsq", "state_activation"):
 
             def body(state, xs):
                 state, output, aux = self.step(state, *xs, training)
@@ -428,6 +444,8 @@ class Branch(eqx.Module):
                 else states
             )
             y = jax.nn.leaky_relu(jnp.real(readout @ c.T) + y @ cell.skip.T)
+            if cell.quantization == "activation":
+                y = fsq(y, cell.levels, cell.scale)
             if self.residual and i > 0:
                 y = y + previous
             layer_states.append(states)
@@ -652,3 +670,15 @@ def fsq_diagnostics(raw, previous, levels=5, scale=1.0, valid=None):
             }
         )
     return result
+
+
+def fsq_metric_names(mode):
+    components = [] if mode == "activation" else ["real", "imag"]
+    if mode in ("activation", "state_activation"):
+        components.append("activation_real")
+    return [
+        f"fsq_{branch}_{component}_{metric}"
+        for branch in ("actor", "critic")
+        for component in components
+        for metric in ("error", "saturation", "utilization", "entropy_nats", "change")
+    ]

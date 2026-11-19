@@ -1,0 +1,2 @@
+variant,seeds,steps_per_seed,score_mean,score_seed_std,memory_bias
+lru,3,98304,0.67381884654363,0.042182190976147775,

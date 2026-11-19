@@ -22,7 +22,9 @@ def test_quantizer(levels):
     assert np.all(np.isfinite(grad)) and np.all(grad > 0)
 
 
-@pytest.mark.parametrize("mode", ["none", "fsq", "output"])
+@pytest.mark.parametrize(
+    "mode", ["none", "fsq", "output", "activation", "state_activation"]
+)
 def test_replay_reset_and_gradient(mode):
     branch = Branch(
         None, "lru", 5, 4, 2, 0.1, jax.random.key(0), recurrent_state_quantization=mode
@@ -138,3 +140,18 @@ def test_scale_and_known_diagnostic_distribution():
     np.testing.assert_allclose(stats["real_saturation"], 0.5)
     np.testing.assert_allclose(stats["real_change"], 0.5)
     np.testing.assert_allclose(stats["real_error"], 1.0)
+
+
+@pytest.mark.parametrize("mode", ["activation", "state_activation"])
+def test_post_activation_placement(mode):
+    from popgym_arcade.experiments.memory_models import LRUCell
+
+    key = jax.random.key(42)
+    reference = LRUCell(3, 4, key, "fsq" if mode == "state_activation" else "none")
+    cell = LRUCell(3, 4, key, mode)
+    state = jnp.full(4, 0.2 + 0.4j)
+    x = jnp.array([0.5, -0.3, 1.0])
+    expected_state, activated = reference(state, x, jnp.ones(4))
+    actual_state, output = cell(state, x, jnp.ones(4))
+    np.testing.assert_array_equal(actual_state, expected_state)
+    np.testing.assert_array_equal(output, fsq(activated))

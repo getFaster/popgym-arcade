@@ -43,3 +43,17 @@ across training seeds. Episode standard errors are not training-seed uncertainty
 Quantization can erase weak signals, accumulate error, or saturate. Hundreds of
 scalar codes still permit enormous state spaces. This tests an inductive bias,
 not guaranteed memory improvement; no performance claim follows from unit tests.
+
+## Post-activation ablations
+
+`activation` applies `Q(leaky_relu(Re(C h) + D x))` in each LRU layer,
+with continuous state. `state_activation` additionally quantizes the complex
+state after every update. Both use the same levels and scale at both locations.
+The former keeps layerwise associative replay; the latter uses sequential replay.
+FSQ is before any optional residual addition (these experiments disable residuals).
+This does not change the historical `output` mode, which quantizes before C.
+Activation diagnostics use `fsq_{actor|critic}_activation_real_*`; code-change
+statistics exclude resets and the first step of each rollout, since no previous
+activation is stored across rollouts. State diagnostics are also logged for
+`state_activation`. The memory-gap definition is **MLP minus LRU-variant return
+on fully observed MDP**; a shared MLP reference cancels in relative gap changes.

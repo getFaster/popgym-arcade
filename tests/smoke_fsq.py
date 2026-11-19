@@ -22,7 +22,7 @@ def main():
     obs, state = jax.vmap(env.reset, in_axes=(0, None))(
         jax.random.split(jax.random.PRNGKey(1), 1), params
     )
-    for mode in ("none", "fsq", "output"):
+    for mode in ("activation", "state_activation"):
         model = MemoryActorCritic(
             "lru",
             jax.random.PRNGKey(0),
@@ -49,7 +49,7 @@ def main():
         model, opt, runner, metrics, _, _ = update(model, opt, runner)
         metrics = np.asarray(metrics)
         assert np.isfinite(metrics).all()
-        assert len(metrics) == (9 if mode == "none" else 29)
+        assert len(metrics) == (19 if mode == "activation" else 39)
         assert all(
             np.isfinite(x).all()
             for x in jax.tree.leaves(eqx.filter(model, eqx.is_array))
