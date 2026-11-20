@@ -80,9 +80,16 @@ pip install 'popgym-arcade[baselines,human]'
 The [play script](popgym_arcade/play.py) installed with `pip install popgym-arcade[human]` lets you play the games yourself using the arrow keys and spacebar.
 
 ```bash
+popgym-arcade-play                         # open the game menu
 popgym-arcade-play NoisyCartPoleEasy        # play MDP 256 pixel version
 popgym-arcade-play BattleShipEasy -p -o 128 # play POMDP 128 pixel version
 ```
+
+In the menu, choose a game and difficulty, select the observation mode, then
+click **Play** or press **Enter**. Press **Esc** during play to return to the menu.
+With the keyboard, use the arrow keys to select a game, **D** to cycle difficulty,
+and **M** to toggle observation mode.
+Press **Esc** from the menu to quit the arcade.
 
 
 ## Other Useful Libraries
