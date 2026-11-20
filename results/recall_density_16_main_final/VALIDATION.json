@@ -1,14 +1,15 @@
 {
-  "checkpoints": 48,
-  "defined_checkpoints": 48,
-  "plain_lru_checkpoints": 12,
-  "averaged_groups": 20,
-  "existing_intervention_checkpoint_results": "unchanged",
-  "existing_intervention_averages": "unchanged",
-  "validation": "passed: actual endpoints, ten-observation windows, bin sums, baseline seed counts and missing seed SD",
-  "focused_tests_passed": 15,
-  "retained_policy_files": 36,
-  "retained_resumable_files": 20,
-  "plain_lru_weights_removed": true,
-  "cleanup_checks": "passed: retained-file allowlist, unchanged diagnostic data, plot regeneration without pruned weights, queue refuses missing weights without modifying results"
+  "checkpoints": 96,
+  "groups": 32,
+  "training_seeds": [
+    0,
+    1,
+    2
+  ],
+  "trajectories_per_checkpoint": 5,
+  "endpoint": "last pre-terminal policy input",
+  "scope": "whole episode",
+  "bins": 16,
+  "hashes_verified": true,
+  "steps_per_checkpoint": 98304
 }

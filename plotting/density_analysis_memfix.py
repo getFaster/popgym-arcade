@@ -124,6 +124,28 @@ def collect(model, env, params, seed, steps, window=10):
     return (tuple(jnp.stack(x) for x in zip(*history)), carries[0], timestep + 1)
 
 
+def collect_episode(model, env, params, seed, safety_limit):
+    """Collect every policy input up to termination, never an autoreset input.
+
+    A safety limit is a failure boundary, not an artificial episode endpoint.
+    """
+    rng, key = jax.random.split(jax.random.PRNGKey(seed))
+    obs, state = env.reset(key, params)
+    memory = model.initial_state(1)[0][0]
+    action, reward, done = jnp.array(0), jnp.array(0.0), jnp.array(True)
+    history = []
+    for _ in range(safety_limit):
+        history.append((obs, action, reward, done))
+        memory, logits = actor_step(model.actor, memory, obs, action, reward, done)
+        action = logits.argmax().astype(jnp.int32)
+        rng, key = jax.random.split(rng)
+        obs, state, reward, terminal, _ = step_env(env, key, state, action, params)
+        done = jnp.array(False)
+        if bool(terminal):
+            return tuple(jnp.stack(x) for x in zip(*history))
+    raise RuntimeError(f"Episode did not terminate within {safety_limit} steps")
+
+
 @eqx.filter_jit
 def step_env(env, key, state, action, params):
     return env.step(key, state, action, params)

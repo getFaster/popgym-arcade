@@ -159,6 +159,65 @@ def test_sliding_window_preserves_rollout_carry(monkeypatch):
     np.testing.assert_allclose(state, [[78]])
 
 
+def test_full_episode_keeps_first_and_last_inputs_and_rejects_truncation(monkeypatch):
+    from plotting import density_analysis_memfix as diagnostic
+
+    class Model:
+        actor = None
+
+        def initial_state(self, batch):
+            return (jnp.zeros((batch, 1, 1)),)
+
+    class Env:
+        def reset(self, key, params):
+            return jnp.array([0]), 0
+
+        def step(self, key, state, action, params):
+            return jnp.array([state + 1]), state + 1, jnp.array(1.0), state == 2, {}
+
+    monkeypatch.setattr(
+        diagnostic,
+        "actor_step",
+        lambda actor, memory, *args: (memory, jnp.array([0.0, 1.0])),
+    )
+    monkeypatch.setattr(diagnostic, "step_env", lambda env, *args: env.step(*args))
+    obs, actions, rewards, done = diagnostic.collect_episode(Model(), Env(), None, 4, 3)
+    np.testing.assert_array_equal(obs.ravel(), [0, 1, 2])
+    np.testing.assert_array_equal(actions, [0, 1, 1])
+    np.testing.assert_array_equal(rewards, [0, 1, 1])
+    np.testing.assert_array_equal(done, [True, False, False])
+    with pytest.raises(RuntimeError, match="did not terminate"):
+        diagnostic.collect_episode(Model(), Env(), None, 4, 2)
+
+
+def test_full_episode_aggregate_requires_three_seeds_and_valid_bins():
+    from plotting.aggregate_full_recall import aggregate
+
+    sample = {
+        "length": 2,
+        "endpoint": 1,
+        "distribution": [0.25, 0.75],
+        "bins": [0.25] + [0.0] * 14 + [0.75],
+    }
+    rows = [
+        {
+            "task": "task",
+            "mode": "MDP",
+            "intervention": "Plain LRU",
+            "training_seed": seed,
+            "samples": [dict(sample, trajectory_seed=i) for i in range(5)],
+        }
+        for seed in range(3)
+    ]
+    assert not aggregate(rows[:2])[0]
+    complete, incomplete = aggregate(rows)
+    assert not incomplete
+    np.testing.assert_allclose(complete[0]["bins"], sample["bins"])
+    rows[0]["samples"][0] = dict(sample, trajectory_seed=0, endpoint=0)
+    with pytest.raises(ValueError, match="invalid trajectory"):
+        aggregate(rows)
+
+
 @pytest.mark.parametrize(
     "requested,collected,fallback,expected,status",
     [
