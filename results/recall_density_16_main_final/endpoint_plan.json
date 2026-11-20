@@ -1,0 +1,26 @@
+{
+  "seed": 20261120,
+  "horizon": 32,
+  "window": 10,
+  "endpoints": [
+    23,
+    27,
+    25,
+    21,
+    18,
+    15,
+    13,
+    22
+  ],
+  "trajectory_seeds": [
+    1000000,
+    1000001,
+    1000002,
+    1000003,
+    1000004,
+    1000005,
+    1000006,
+    1000007
+  ],
+  "sampling": "8 distinct endpoints uniformly sampled from 9..horizon-1; shared across checkpoints"
+}

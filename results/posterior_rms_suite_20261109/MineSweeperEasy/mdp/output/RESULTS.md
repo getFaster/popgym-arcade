@@ -1,17 +1,17 @@
 # Memory-bias pilot results
 
-Scores are held-out stochastic-policy episode returns. Lower memory bias is better.
+Scores are held-out stochastic-policy episode returns.
 
-| Variant | Steps/seed | Seeds | Score | MLP − score |
-|---|---:|---:|---:|---:|
-| ib_forward_prior20 | 98304 | 1 | 0.505859 | pending |
-| ib_forward_prior80 | 98304 | 1 | 0.440011 | pending |
-| ib_reverse_prior20 | 98304 | 1 | 0.455357 | pending |
-| ib_reverse_prior80 | 98304 | 1 | 0.343192 | pending |
-| ib_symmetric_prior20 | 98304 | 1 | 0.339565 | pending |
-| ib_symmetric_prior80 | 98304 | 1 | 0.456194 | pending |
-| ib_renyi_half_prior20 | 98304 | 1 | 0.410435 | pending |
-| ib_renyi_half_prior80 | 98304 | 1 | 0.389230 | pending |
+| Variant | Steps/seed | Seeds | Score |
+|---|---:|---:|---:|
+| ib_forward_prior20 | 98304 | 1 | 0.505859 |
+| ib_forward_prior80 | 98304 | 1 | 0.440011 |
+| ib_reverse_prior20 | 98304 | 1 | 0.455357 |
+| ib_reverse_prior80 | 98304 | 1 | 0.343192 |
+| ib_symmetric_prior20 | 98304 | 1 | 0.339565 |
+| ib_symmetric_prior80 | 98304 | 1 | 0.456194 |
+| ib_renyi_half_prior20 | 98304 | 1 | 0.410435 |
+| ib_renyi_half_prior80 | 98304 | 1 | 0.389230 |
 
 A short pilot with one seed cannot establish a regularization benefit. Full-budget, multiple-seed runs are needed.
 

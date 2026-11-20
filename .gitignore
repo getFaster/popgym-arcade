@@ -17,3 +17,20 @@ wandb/
 results/**/model.eqx
 !results/**/summary.csv
 results/development_checks/lru_serial_incomplete/
+
+# Local checkpoint payloads and generated runtime artifacts.
+results/**/*.eqx
+results/**/*.tar
+results/**/*.tar.gz
+results/**/*.log
+results/**/complete
+results/.recall_queue.lock
+results/_archive/*
+!results/_archive/README.md
+results/recall_density_16_main_final/jobs/
+results/recall_density_16_main_final/queue.json
+
+# Keep the small published measurements and final figure exports.
+!results/recall_density_16_main_final/*.csv
+!results/recall_density_16_main_final/*.pdf
+!results/memfix_short_20261119/metrics_*.csv

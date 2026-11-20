@@ -1,0 +1,12 @@
+# Memory-bias pilot results
+
+Scores are held-out stochastic-policy episode returns. Lower memory bias is better.
+
+| Variant | Steps/seed | Seeds | Score | MLP − score |
+|---|---:|---:|---:|---:|
+| mlp | 98304 | 2 | -0.054138 | 0.000000 |
+| ib_reverse_prior20 | 98304 | 1 | -0.287109 | -0.229614 |
+
+A short pilot with one seed cannot establish a regularization benefit. Full-budget, multiple-seed runs are needed.
+
+IB heads use current input and posterior mean/log variance, providing a recurrent-state path without sampling.

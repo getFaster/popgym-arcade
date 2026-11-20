@@ -20,7 +20,8 @@ from jax import lax
 #     sys.path.insert(0, REPO_ROOT)
 
 import popgym_arcade
-from popgym_arcade.baselines.model import ActorCriticRNN, add_batch_dim
+from popgym_arcade.baselines.model import ActorCriticRNN
+from memax.equinox.train_utils import add_batch_dim
 from popgym_arcade.wrappers import LogWrapper
 
 from plotting.utils import (
@@ -63,7 +64,9 @@ def get_gradient_ppo(
         obs_in = add_batch_dim(add_batch_dim(obs, 1), 1)
         done_in = add_batch_dim(add_batch_dim(done, 1), 1)
         action_in = add_batch_dim(add_batch_dim(action, 1), 1)
-        actor_state, critic_state, policy, _ = model(actor_state, critic_state, (obs_in, done_in))
+        actor_state, critic_state, policy, _ = model(
+            actor_state, critic_state, (obs_in, done_in)
+        )
 
         del action_in  # PPO action history is not replayed for the gradient target.
         action = lax.stop_gradient(policy).logits[-1].squeeze(axis=0).argmax(axis=-1)
@@ -81,9 +84,9 @@ def get_gradient_ppo(
     dones = [done]
 
     for _ in range(max_episode_steps):
-        actor_state, critic_state, env_state, obs, done, action, seed = jax.jit(step_env)(
-            actor_state, critic_state, env_state, obs, done, action, seed
-        )
+        actor_state, critic_state, env_state, obs, done, action, seed = jax.jit(
+            step_env
+        )(actor_state, critic_state, env_state, obs, done, action, seed)
         observations.append(obs.astype(jnp.float32))
         dones.append(done)
         if jnp.any(done):
@@ -105,6 +108,13 @@ def get_gradient_ppo(
     return jax.grad(compute_logits_sum)(observations[:-1], dones[:-1])
 
 
+def normalize_recall_gradients(grads_obs):
+    """Upstream definition: absolute gradient of summed policy logits, then L1."""
+    timestep_grads = jnp.abs(grads_obs).sum(axis=tuple(range(1, grads_obs.ndim)))
+    denom = timestep_grads.sum()
+    return jnp.where(denom > 0, timestep_grads / denom, jnp.zeros_like(timestep_grads))
+
+
 def compute_recall_density(
     rng: jax.random.PRNGKey,
     model: eqx.Module,
@@ -115,9 +125,7 @@ def compute_recall_density(
     if grads_obs.size == 0:
         return np.array([])
 
-    timestep_grads = jnp.abs(grads_obs).sum(axis=(1, 2, 3))
-    denom = timestep_grads.sum()
-    dist = jnp.where(denom > 0, timestep_grads / denom, jnp.zeros_like(timestep_grads))
+    dist = normalize_recall_gradients(grads_obs)
     print(f"Distribution sum: {dist.sum()}")
     return np.array(dist)
 
@@ -169,7 +177,9 @@ def _build_output_csv_path(config: Dict[str, Any], out_dir: str) -> str:
     )
 
 
-def _load_model(model_path: str, config: Dict[str, Any], rng: jax.random.PRNGKey) -> eqx.Module:
+def _load_model(
+    model_path: str, config: Dict[str, Any], rng: jax.random.PRNGKey
+) -> eqx.Module:
     network = ActorCriticRNN(
         rng,
         rnn_type=config["MEMORY_TYPE"],

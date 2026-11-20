@@ -1,0 +1,171 @@
+{
+  "directory": "checkpoints/step_000098304",
+  "format_version": 1,
+  "completed_updates": 48,
+  "actual_steps": 98304,
+  "requested_steps": 100000,
+  "final_training_steps": 98304,
+  "elapsed_seconds": 383.35577249100015,
+  "checkpoint_interval": 100000,
+  "final": true,
+  "threshold_steps": 100000,
+  "run_signature": "138ff5d4bb1150294b332e57e68806a90b760671f667980b3f8fd6d594ee9d85",
+  "run_metadata": {
+    "head_inputs": "input_t, posterior_mean, posterior_log_variance",
+    "normalization": "fixed_calibration_rms_excess_above_one_bit",
+    "rms_calibration": {
+      "env": "CartPoleHard",
+      "partial_obs": false,
+      "posterior_input": "output",
+      "seed": 2,
+      "residual": true,
+      "hidden": 512,
+      "layers": 2,
+      "obs_size": 128,
+      "samples": 2048,
+      "policy": "uniform_random_5_actions",
+      "calibration_seed": 900002,
+      "batch_sha256": "33c5b05b83f5c4e7d989cfdc864da42a23f594c800389c2e01b95f864812eec4",
+      "scales_bits": {
+        "forward_kl": [
+          5.346256089446667,
+          5.371703888171667
+        ],
+        "reverse_kl": [
+          5.350742022425353,
+          5.366713133890613
+        ],
+        "symmetric_kl": [
+          5.348498123273568,
+          5.369203027407936
+        ],
+        "renyi_half": [
+          2.6715188503506844,
+          2.681679111860265
+        ]
+      },
+      "raw": {
+        "forward_kl": {
+          "mean_bits": [
+            5.310229557332631,
+            5.335319735009535
+          ],
+          "max_bits": [
+            6.073753744413622,
+            6.047868979597562
+          ]
+        },
+        "reverse_kl": {
+          "mean_bits": [
+            5.314587341578987,
+            5.330226753986402
+          ],
+          "max_bits": [
+            6.08571892139945,
+            6.054577678842419
+          ]
+        },
+        "symmetric_kl": {
+          "mean_bits": [
+            5.312408451219303,
+            5.332773244413993
+          ],
+          "max_bits": [
+            6.079736676871838,
+            6.050775486397145
+          ]
+        },
+        "renyi_half": {
+          "mean_bits": [
+            2.6535150435363626,
+            2.663505475794441
+          ],
+          "max_bits": [
+            3.0363272156546537,
+            3.0216822050030823
+          ]
+        }
+      },
+      "minimum_scale_bits": 1e-08
+    },
+    "rms_scales_bits": [
+      5.350742022425353,
+      5.366713133890613
+    ],
+    "prediction_head_inputs": "input_t, posterior_mean, posterior_log_variance",
+    "prediction_coefficient": 1.0,
+    "prediction_target": "branch CNN embedding (512), reward; selected action; both CNN paths detached",
+    "variant": "ib_reverse_prior20_prediction",
+    "seed": 2,
+    "upstream_commit": "d061b611718ae55d095791b4ea7046b5266cafd4",
+    "config": {
+      "TRAIN_TYPE": "PPO_RNN",
+      "MEMORY_TYPE": "lru",
+      "SEED": 0,
+      "NUM_SEEDS": 1,
+      "LR": 0.0001,
+      "NUM_ENVS": 16,
+      "NUM_STEPS": 128,
+      "TOTAL_TIMESTEPS": 100000,
+      "UPDATE_EPOCHS": 4,
+      "NUM_MINIBATCHES": 16,
+      "GAMMA": 0.99,
+      "GAE_LAMBDA": 0.95,
+      "CLIP_EPS": 0.2,
+      "ENT_COEF": 0.01,
+      "VF_COEF": 0.5,
+      "MAX_GRAD_NORM": 0.5,
+      "ENV_NAME": "CartPoleHard",
+      "PARTIAL": false,
+      "ANNEAL_LR": true,
+      "DEBUG": true,
+      "PROJECT": "popgym_arcade-acrade-",
+      "ENTITY": "",
+      "WANDB_MODE": "disabled",
+      "OBS_SIZE": 128
+    },
+    "requested_steps": 100000,
+    "actual_steps": 98304,
+    "weight_decay": 0,
+    "state_dropout": 0,
+    "ib_coefficient": 1.0,
+    "ib_kl_units": "bits",
+    "ib_divergence_units": "bits",
+    "divergence": "reverse_kl",
+    "kl_prior_gradient_weight": 0.4,
+    "kl_posterior_gradient_weight": 1.6,
+    "posterior_input": "output",
+    "recurrent_state_quantization": "none",
+    "fsq_levels": 5,
+    "fsq_scale": 1.0,
+    "lru_residual": true,
+    "ib_free_bits": 1,
+    "ib_distribution": "diagonal multivariate normal",
+    "hidden": 512,
+    "layers": 2,
+    "flattened_state_real_dimension_per_branch": 2048,
+    "gaussian_dimension_per_branch": 1365,
+    "device": "cuda:0",
+    "device_kind": "Tesla T4",
+    "parameter_count": 33074824,
+    "source_sha256": {
+      "memory_bias.py": "62eb287c4c608378ab95dbc8eb1e5cf373b483f06549c836d7f53cc9c5f6f8e1",
+      "memory_models.py": "82b47cb8ce62aa80a11e73dcffda44277168dd35ea075cccdca0bc37b14ba487",
+      "calibrate_divergences.py": "85e309c68907cb8c0a996c86ba32d27c384387c5af7bc74807d17568ee836d12",
+      "checkpoints.py": "90f40a8ccfa14a9d384df9972ec393c9b4d7ebdc349a5011ba24ea4cbd77a8ea",
+      "uv.lock": "b69e580fd829cad42f78b217800db80138de4fbf72728bc61d2d3b68e65a46a7"
+    },
+    "jax_version": "0.6.2",
+    "evaluation_episodes": 64,
+    "learning_rate_schedule_steps": 100000,
+    "gradient_log_interval": 0,
+    "resume_from": null,
+    "budget_extension": false,
+    "extension_schedule_policy": null,
+    "checkpoint_interval": 100000,
+    "checkpoint_state": "full_training_state"
+  },
+  "training_state_sha256": "56dabc5142f5cffd53a974ca03905b5fa31572621bb0362dbdb2bf31ec6d3d0e",
+  "training_state_bytes": 397978352,
+  "contents": "model, optimizer including schedule counters, environment state, observation, previous action/reward, recurrent memory, done flags, RNG"
+}

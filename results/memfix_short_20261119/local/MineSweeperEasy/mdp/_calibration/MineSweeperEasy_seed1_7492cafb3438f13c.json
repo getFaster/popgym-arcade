@@ -1,0 +1,75 @@
+{
+  "env": "MineSweeperEasy",
+  "partial_obs": false,
+  "posterior_input": "output",
+  "seed": 1,
+  "residual": true,
+  "hidden": 512,
+  "layers": 2,
+  "obs_size": 128,
+  "samples": 2048,
+  "policy": "uniform_random_5_actions",
+  "calibration_seed": 900001,
+  "batch_sha256": "3700daa1b17bcbe0bf026d175d6f4647b260db7f77a2d6a57be98131c48fc858",
+  "scales_bits": {
+    "forward_kl": [
+      6.864764855616296,
+      6.8492784827605515
+    ],
+    "reverse_kl": [
+      6.864663864204408,
+      6.841976055768133
+    ],
+    "symmetric_kl": [
+      6.8647121972018255,
+      6.845621162224409
+    ],
+    "renyi_half": [
+      3.427609851056406,
+      3.417863402897242
+    ]
+  },
+  "raw": {
+    "forward_kl": {
+      "mean_bits": [
+        6.829817025061992,
+        6.804674410731394
+      ],
+      "max_bits": [
+        7.826431691078919,
+        8.45273334348937
+      ]
+    },
+    "reverse_kl": {
+      "mean_bits": [
+        6.829703625177243,
+        6.797923076920208
+      ],
+      "max_bits": [
+        7.827142323392284,
+        8.413336245760323
+      ]
+    },
+    "symmetric_kl": {
+      "mean_bits": [
+        6.829760332257569,
+        6.8012987431539935
+      ],
+      "max_bits": [
+        7.826787351200903,
+        8.433034450659544
+      ]
+    },
+    "renyi_half": {
+      "mean_bits": [
+        3.410189864007948,
+        3.3957702173898503
+      ],
+      "max_bits": [
+        3.9077598679234877,
+        4.209199019570258
+      ]
+    }
+  },
+  "minimum_scale_bits": 1e-08
+}

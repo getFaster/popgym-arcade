@@ -1,10 +1,10 @@
 # Memory-bias pilot results
 
-Scores are held-out stochastic-policy episode returns. Lower memory bias is better.
+Scores are held-out stochastic-policy episode returns.
 
-| Variant | Steps/seed | Seeds | Score | MLP − score |
-|---|---:|---:|---:|---:|
-| lru | 98304 | 3 | 0.291015 | pending |
+| Variant | Steps/seed | Seeds | Score |
+|---|---:|---:|---:|
+| lru | 98304 | 3 | 0.291015 |
 
 A short pilot with one seed cannot establish a regularization benefit. Full-budget, multiple-seed runs are needed.
 

@@ -1,0 +1,2 @@
+# Python's CSV writer emits CRLF; preserve measurement bytes without whitespace warnings.
+*.csv whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

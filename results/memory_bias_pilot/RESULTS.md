@@ -2,17 +2,15 @@
 
 Completed on CUDA (NVIDIA GeForce RTX 2060 with Max-Q Design), JAX 0.6.2. Environment: fully observed `CartPoleHard`. Each condition used training seed 0, 98,304 environment steps, and 64 held-out evaluation episodes. The approved 100K budget was rounded down to complete 2,048-step PPO rollouts.
 
-`memory bias = MLP reference score − condition score`. Positive bias means the reference outperformed that condition. Positive bias reduction below means an improvement over unregularized LRU.
+| Condition | Held-out return ± episode SE | Parameters |
+|---|---:|---:|
+| MLP reference | 0.705572 ± 0.022491 | 1,279,238 |
+| LRU baseline | 0.600703 ± 0.021015 | 6,940,422 |
+| + weight decay (1e-4) | 0.550885 ± 0.020309 | 6,940,422 |
+| + state dropout (0.1) | 0.588932 ± 0.021705 | 6,940,422 |
+| + information bottleneck (1 free bit) | 0.646822 ± 0.024760 | 24,794,014 |
 
-| Condition | Held-out return ± episode SE | Memory bias | Bias reduction vs LRU | Parameters |
-|---|---:|---:|---:|---:|
-| MLP reference | 0.705572 ± 0.022491 | 0.000000 | — | 1,279,238 |
-| LRU baseline | 0.600703 ± 0.021015 | 0.104870 | +0.000000 | 6,940,422 |
-| + weight decay (1e-4) | 0.550885 ± 0.020309 | 0.154687 | -0.049818 | 6,940,422 |
-| + state dropout (0.1) | 0.588932 ± 0.021705 | 0.116641 | -0.011771 | 6,940,422 |
-| + information bottleneck (1 free bit) | 0.646822 ± 0.024760 | 0.058750 | +0.046120 | 24,794,014 |
-
-Information bottleneck reduced the observed gap by **44.0%** relative to the LRU baseline. Weight decay and state dropout did not reduce the gap in this pilot.
+Information bottleneck increased held-out return by 0.046120 relative to the LRU baseline. Weight decay and state dropout lowered the return in this pilot.
 
 These are single-training-seed pilot results at roughly 1% of the upstream training budget. Episode-level standard errors do not measure variation across training seeds. The results do not establish statistical significance or a general regularization benefit. The conditions also differ in parameter count, especially IB; there is no parameter-matched control.
 
