@@ -1,0 +1,159 @@
+{
+  "head_inputs": "input_t, posterior_mean, posterior_log_variance",
+  "normalization": "fixed_calibration_rms_excess_above_one_bit",
+  "rms_calibration": {
+    "env": "MineSweeperEasy",
+    "partial_obs": false,
+    "posterior_input": "output",
+    "seed": 1,
+    "residual": true,
+    "hidden": 512,
+    "layers": 2,
+    "obs_size": 128,
+    "samples": 2048,
+    "policy": "uniform_random_5_actions",
+    "calibration_seed": 900001,
+    "batch_sha256": "3700daa1b17bcbe0bf026d175d6f4647b260db7f77a2d6a57be98131c48fc858",
+    "scales_bits": {
+      "forward_kl": [
+        6.864764855616296,
+        6.8492784827605515
+      ],
+      "reverse_kl": [
+        6.864663864204408,
+        6.841976055768133
+      ],
+      "symmetric_kl": [
+        6.8647121972018255,
+        6.845621162224409
+      ],
+      "renyi_half": [
+        3.427609851056406,
+        3.417863402897242
+      ]
+    },
+    "raw": {
+      "forward_kl": {
+        "mean_bits": [
+          6.829817025061992,
+          6.804674410731394
+        ],
+        "max_bits": [
+          7.826431691078919,
+          8.45273334348937
+        ]
+      },
+      "reverse_kl": {
+        "mean_bits": [
+          6.829703625177243,
+          6.797923076920208
+        ],
+        "max_bits": [
+          7.827142323392284,
+          8.413336245760323
+        ]
+      },
+      "symmetric_kl": {
+        "mean_bits": [
+          6.829760332257569,
+          6.8012987431539935
+        ],
+        "max_bits": [
+          7.826787351200903,
+          8.433034450659544
+        ]
+      },
+      "renyi_half": {
+        "mean_bits": [
+          3.410189864007948,
+          3.3957702173898503
+        ],
+        "max_bits": [
+          3.9077598679234877,
+          4.209199019570258
+        ]
+      }
+    },
+    "minimum_scale_bits": 1e-08
+  },
+  "rms_scales_bits": [
+    6.864663864204408,
+    6.841976055768133
+  ],
+  "prediction_head_inputs": null,
+  "prediction_coefficient": 0,
+  "prediction_target": null,
+  "variant": "ib_reverse_prior20",
+  "seed": 1,
+  "upstream_commit": "d061b611718ae55d095791b4ea7046b5266cafd4",
+  "config": {
+    "TRAIN_TYPE": "PPO_RNN",
+    "MEMORY_TYPE": "lru",
+    "SEED": 0,
+    "NUM_SEEDS": 1,
+    "LR": 0.0001,
+    "NUM_ENVS": 16,
+    "NUM_STEPS": 128,
+    "TOTAL_TIMESTEPS": 100000,
+    "UPDATE_EPOCHS": 4,
+    "NUM_MINIBATCHES": 16,
+    "GAMMA": 0.99,
+    "GAE_LAMBDA": 0.95,
+    "CLIP_EPS": 0.2,
+    "ENT_COEF": 0.01,
+    "VF_COEF": 0.5,
+    "MAX_GRAD_NORM": 0.5,
+    "ENV_NAME": "MineSweeperEasy",
+    "PARTIAL": false,
+    "ANNEAL_LR": true,
+    "DEBUG": true,
+    "PROJECT": "popgym_arcade-acrade-",
+    "ENTITY": "",
+    "WANDB_MODE": "disabled",
+    "OBS_SIZE": 128
+  },
+  "requested_steps": 100000,
+  "actual_steps": 98304,
+  "weight_decay": 0,
+  "state_dropout": 0,
+  "ib_coefficient": 1.0,
+  "ib_kl_units": "bits",
+  "ib_divergence_units": "bits",
+  "divergence": "reverse_kl",
+  "kl_prior_gradient_weight": 0.4,
+  "kl_posterior_gradient_weight": 1.6,
+  "posterior_input": "output",
+  "recurrent_state_quantization": "none",
+  "fsq_levels": 5,
+  "fsq_scale": 1.0,
+  "lru_residual": true,
+  "ib_free_bits": 1,
+  "ib_distribution": "diagonal multivariate normal",
+  "hidden": 512,
+  "layers": 2,
+  "flattened_state_real_dimension_per_branch": 2048,
+  "gaussian_dimension_per_branch": 1365,
+  "device": "cuda:0",
+  "device_kind": "NVIDIA GeForce RTX 2060 with Max-Q Design",
+  "parameter_count": 16407454,
+  "source_sha256": {
+    "memory_bias.py": "62eb287c4c608378ab95dbc8eb1e5cf373b483f06549c836d7f53cc9c5f6f8e1",
+    "memory_models.py": "82b47cb8ce62aa80a11e73dcffda44277168dd35ea075cccdca0bc37b14ba487",
+    "calibrate_divergences.py": "85e309c68907cb8c0a996c86ba32d27c384387c5af7bc74807d17568ee836d12",
+    "checkpoints.py": "90f40a8ccfa14a9d384df9972ec393c9b4d7ebdc349a5011ba24ea4cbd77a8ea",
+    "uv.lock": "b69e580fd829cad42f78b217800db80138de4fbf72728bc61d2d3b68e65a46a7"
+  },
+  "jax_version": "0.6.2",
+  "evaluation_episodes": 64,
+  "learning_rate_schedule_steps": 100000,
+  "gradient_log_interval": 0,
+  "resume_from": null,
+  "budget_extension": false,
+  "extension_schedule_policy": null,
+  "checkpoint_interval": 100000,
+  "checkpoint_state": "full_training_state",
+  "evaluation_mean": 0.4034598469734192,
+  "evaluation_std": 0.2712039649486542,
+  "evaluation_standard_error": 0.03390049561858177,
+  "seconds": 455.94617972002015
+}

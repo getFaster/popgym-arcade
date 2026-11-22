@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "completed_runs": 12,
+  "expected_runs": 12,
+  "verified": [
+    "source hashes or copied artifact digests",
+    "matching PPO settings and steps",
+    "raw return statistics",
+    "evaluation counts",
+    "shared IB calibration and defaults",
+    "prediction head inputs"
+  ]
+}

@@ -1,0 +1,159 @@
+{
+  "head_inputs": "input_t, posterior_mean, posterior_log_variance",
+  "normalization": "fixed_calibration_rms_excess_above_one_bit",
+  "rms_calibration": {
+    "env": "NavigatorEasy",
+    "partial_obs": true,
+    "posterior_input": "output",
+    "seed": 2,
+    "residual": true,
+    "hidden": 512,
+    "layers": 2,
+    "obs_size": 128,
+    "samples": 2048,
+    "policy": "uniform_random_5_actions",
+    "calibration_seed": 900002,
+    "batch_sha256": "b883544ed1d64e80570d91d9d820d305fafdb9de173075577c1103ad6d40192a",
+    "scales_bits": {
+      "forward_kl": [
+        6.111447611994788,
+        6.129711825768619
+      ],
+      "reverse_kl": [
+        6.115181363082534,
+        6.1235283808475485
+      ],
+      "symmetric_kl": [
+        6.113313632258307,
+        6.126613468343353
+      ],
+      "renyi_half": [
+        3.0530266220140443,
+        3.059567847256467
+      ]
+    },
+    "raw": {
+      "forward_kl": {
+        "mean_bits": [
+          6.067183583912108,
+          6.084568878283733
+        ],
+        "max_bits": [
+          6.967738137724795,
+          6.952853383257921
+        ]
+      },
+      "reverse_kl": {
+        "mean_bits": [
+          6.070833532410647,
+          6.078353250107815
+        ],
+        "max_bits": [
+          6.971020254633861,
+          6.963849266023485
+        ]
+      },
+      "symmetric_kl": {
+        "mean_bits": [
+          6.069008549595835,
+          6.081461058233485
+        ],
+        "max_bits": [
+          6.9693795401446295,
+          6.958351324640703
+        ]
+      },
+      "renyi_half": {
+        "mean_bits": [
+          3.030934538990947,
+          3.0370526895333425
+        ],
+        "max_bits": [
+          3.4799698782020356,
+          3.4744103670302446
+        ]
+      }
+    },
+    "minimum_scale_bits": 1e-08
+  },
+  "rms_scales_bits": [
+    6.115181363082534,
+    6.1235283808475485
+  ],
+  "prediction_head_inputs": null,
+  "prediction_coefficient": 0,
+  "prediction_target": null,
+  "variant": "ib_reverse_prior20",
+  "seed": 2,
+  "upstream_commit": "d061b611718ae55d095791b4ea7046b5266cafd4",
+  "config": {
+    "TRAIN_TYPE": "PPO_RNN",
+    "MEMORY_TYPE": "lru",
+    "SEED": 0,
+    "NUM_SEEDS": 1,
+    "LR": 0.0001,
+    "NUM_ENVS": 16,
+    "NUM_STEPS": 128,
+    "TOTAL_TIMESTEPS": 100000,
+    "UPDATE_EPOCHS": 4,
+    "NUM_MINIBATCHES": 16,
+    "GAMMA": 0.99,
+    "GAE_LAMBDA": 0.95,
+    "CLIP_EPS": 0.2,
+    "ENT_COEF": 0.01,
+    "VF_COEF": 0.5,
+    "MAX_GRAD_NORM": 0.5,
+    "ENV_NAME": "NavigatorEasy",
+    "PARTIAL": true,
+    "ANNEAL_LR": true,
+    "DEBUG": true,
+    "PROJECT": "popgym_arcade-acrade-",
+    "ENTITY": "",
+    "WANDB_MODE": "disabled",
+    "OBS_SIZE": 128
+  },
+  "requested_steps": 100000,
+  "actual_steps": 98304,
+  "weight_decay": 0,
+  "state_dropout": 0,
+  "ib_coefficient": 1.0,
+  "ib_kl_units": "bits",
+  "ib_divergence_units": "bits",
+  "divergence": "reverse_kl",
+  "kl_prior_gradient_weight": 0.4,
+  "kl_posterior_gradient_weight": 1.6,
+  "posterior_input": "output",
+  "recurrent_state_quantization": "none",
+  "fsq_levels": 5,
+  "fsq_scale": 1.0,
+  "lru_residual": true,
+  "ib_free_bits": 1,
+  "ib_distribution": "diagonal multivariate normal",
+  "hidden": 512,
+  "layers": 2,
+  "flattened_state_real_dimension_per_branch": 2048,
+  "gaussian_dimension_per_branch": 1365,
+  "device": "cuda:0",
+  "device_kind": "Tesla T4",
+  "parameter_count": 16407454,
+  "source_sha256": {
+    "memory_bias.py": "62eb287c4c608378ab95dbc8eb1e5cf373b483f06549c836d7f53cc9c5f6f8e1",
+    "memory_models.py": "82b47cb8ce62aa80a11e73dcffda44277168dd35ea075cccdca0bc37b14ba487",
+    "calibrate_divergences.py": "85e309c68907cb8c0a996c86ba32d27c384387c5af7bc74807d17568ee836d12",
+    "checkpoints.py": "90f40a8ccfa14a9d384df9972ec393c9b4d7ebdc349a5011ba24ea4cbd77a8ea",
+    "uv.lock": "b69e580fd829cad42f78b217800db80138de4fbf72728bc61d2d3b68e65a46a7"
+  },
+  "jax_version": "0.6.2",
+  "evaluation_episodes": 64,
+  "learning_rate_schedule_steps": 100000,
+  "gradient_log_interval": 0,
+  "resume_from": null,
+  "budget_extension": false,
+  "extension_schedule_policy": null,
+  "checkpoint_interval": 100000,
+  "checkpoint_state": "full_training_state",
+  "evaluation_mean": -0.3695068359375,
+  "evaluation_std": 0.43510332703590393,
+  "evaluation_standard_error": 0.05438791587948799,
+  "seconds": 613.6262496590007
+}
