@@ -1,6 +1,6 @@
 # LRU intervention results
 
-The indexed comparison covers four tasks and four interventions, including the November 22 FSQ state-3 training suite. Each reported run used 98,304 actual training steps (100,000 requested) and 64 held-out evaluation episodes. Inputs were previous action, previous reward, and current observation.
+The report covers four tasks, including the November 22 FSQ state-3 suite and the November 24 frozen-dynamics LRU pilot. Each reported run used 98,304 actual training steps (100,000 requested) and 64 held-out evaluation episodes. Inputs were previous action, previous reward, and current observation.
 
 ## Metrics
 
@@ -11,7 +11,7 @@ The indexed comparison covers four tasks and four interventions, including the N
 
 ## Complete indexed checkpoint comparison
 
-The final checkpoint index contains four tasks, five conditions, both observation modes and seeds 0–2. FSQ in the indexed results denotes five-level post-activation quantization. FSQ state-3 quantizes the carried recurrent state to three levels at scale 1.0. Each row below averages the three independently trained policies and their 64-episode evaluations. Gap is the mean of seed-paired differences; MDP and POMDP policies are trained separately. These plain LRU checkpoints differ from the earlier sweep controls below. Training device varies between runs and can be confounded with seed.
+The comparison below covers the five indexed conditions with checkpoints for all three seeds on all four tasks and both observation modes. FSQ in the indexed results denotes five-level post-activation quantization. FSQ state-3 quantizes the carried recurrent state to three levels at scale 1.0. Each row below averages the three independently trained policies and their 64-episode evaluations. Gap is the mean of seed-paired differences; MDP and POMDP policies are trained separately. These plain LRU checkpoints differ from the earlier sweep controls below. Training device varies between runs and can be confounded with seed.
 
 | Task | Condition | MDP | POMDP | Gap | Gap SD |
 |---|---|---:|---:|---:|---:|
@@ -41,6 +41,42 @@ The final checkpoint index contains four tasks, five conditions, both observatio
 The indexed policies also have whole-trajectory recall measurements, using five episodes per checkpoint and 16 normalized-time bins. Gradient-based recall measures how much observations at each point in an episode contribute to the final action distribution. The plot includes FSQ state-3 recall for all four tasks in both modes, using 120 episodes across 24 checkpoints. [Recall density CSV](lru_interventions_data/recall_density.csv) · [Original recall manifest](lru_interventions_data/sources/results/recall_density_16_main_final/manifest.json) · [FSQ state-3 recall manifest](lru_interventions_data/sources/results/recall_density_16_fsq_state3/manifest.json).
 
 ![Recall density by task](lru_interventions_data/recall_density.png)
+
+## ESN-style LRU with frozen dynamics
+
+The ESN-style variant freezes the LRU state-update parameters in both layers. PPO trains the CNN encoder, LRU output maps, memory projections, and actor and critic heads. Both heads receive the current encoded input and the projected activated LRU output, as in plain LRU. The model has 4,824,838 trainable and 2,115,584 frozen parameters.
+
+All eight seed-0 runs used an RTX 2060. The table compares them with the archived seed-0 vanilla return controls. MineSweeperEasy and BreakoutEasy POMDP controls used a T4. Episode standard errors and both control sets’ source paths are in the metrics files.
+
+| Task | MDP | Δ vs. vanilla | POMDP | Δ vs. vanilla | Gap | Bias |
+|---|---:|---:|---:|---:|---:|---:|
+| CartPoleHard | 0.4333 | -0.1674 | 0.3243 | +0.0619 | +0.1090 | -0.2723 |
+| NavigatorEasy | 0.4558 | +0.0509 | 0.3167 | -0.0884 | +0.1392 | +0.0474 |
+| MineSweeperEasy | 0.4194 | -0.0993 | 0.3242 | -0.0287 | +0.0951 | +0.0276 |
+| BreakoutEasy | -0.6998 | +0.0036 | -0.7070 | +0.0471 | +0.0072 | +0.1385 |
+
+[Return summaries and episode SEs](lru_interventions_data/sources/results/lru_esn_20261124/summary.csv) · [Gap and bias](lru_interventions_data/sources/results/lru_esn_20261124/gap_bias.csv) · [Individual evaluation returns](lru_interventions_data/sources/results/lru_esn_20261124/evaluation_returns.csv)
+
+![Evaluation returns with episode standard errors](lru_interventions_data/esn_returns.png)
+
+All 2,048 complex eigenvalues lie inside the unit circle. The four spectral radii range from 0.98456 to 0.98944, and the longest mode half-lives range from 44.54 to 65.31 steps. The initialization probe produced finite states and head outputs in every task and mode. All eight final checkpoints preserved the frozen weights bit-for-bit.
+
+[Initialization diagnostics](lru_interventions_data/sources/results/lru_esn_20261124/initialization_health_gpu.json) · [Frozen-weight audit](lru_interventions_data/sources/results/lru_esn_20261124/frozen_checkpoint_audit.json)
+
+Whole-episode recall uses five greedy trajectories per policy with reset seeds 1000000–1000004. Each curve shows normalized observation-gradient mass for the final action probabilities in 16 episode-time bins. The plain LRU curves use seed-0 policies from the recall archive, trained on a T4 and measured on CPU. The frozen-dynamics curves were measured on CUDA.
+
+| Task | MDP final-bin mass, frozen / plain | POMDP final-bin mass, frozen / plain |
+|---|---:|---:|
+| CartPoleHard | 78.32% / 75.41% | 63.60% / 64.73% |
+| NavigatorEasy | 65.91% / 70.77% | 56.83% / 68.77% |
+| MineSweeperEasy | 55.11% / 71.50% | 40.48% / 44.05% |
+| BreakoutEasy | 79.11% / 72.77% | 70.05% / 70.30% |
+
+In all four POMDPs, the final-bin share fell while the share on the last observation rose. Episode lengths vary between policies, and the binning convention puts one-step episodes in bin 1. The recall CSV includes the last-observation share and episode-length statistics.
+
+![Seed-0 recall densities for frozen dynamics and plain LRU](lru_interventions_data/esn_recall_density.png)
+
+[16-bin recall metrics](lru_interventions_data/sources/results/lru_esn_20261124/recall_density/averages_16.csv) · [Per-trajectory recall data](lru_interventions_data/sources/results/lru_esn_20261124/recall_density/manifest.json) · [Download metrics ZIP](lru_esn_metrics.zip)
 
 ## CartPoleHard KL and next-observation prediction
 

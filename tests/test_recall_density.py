@@ -210,6 +210,10 @@ def test_full_episode_aggregate_requires_three_seeds_and_valid_bins():
         for seed in range(3)
     ]
     assert not aggregate(rows[:2])[0]
+    single, incomplete = aggregate(rows[:1], training_seeds=(0,))
+    assert not incomplete
+    np.testing.assert_allclose(single[0]["bins"], sample["bins"])
+    assert not aggregate(rows[:2], training_seeds=(0,))[0]
     complete, incomplete = aggregate(rows)
     assert not incomplete
     np.testing.assert_allclose(complete[0]["bins"], sample["bins"])

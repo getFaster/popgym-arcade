@@ -10,7 +10,10 @@ from pathlib import Path
 import numpy as np
 
 
-def aggregate(rows):
+def aggregate(rows, *, training_seeds=(0, 1, 2)):
+    expected_seeds = tuple(sorted(set(training_seeds)))
+    if not expected_seeds:
+        raise ValueError("Expected at least one training seed")
     groups = defaultdict(dict)
     for row in rows:
         key = (row["task"], row["mode"], row["intervention"])
@@ -42,7 +45,7 @@ def aggregate(rows):
         groups[key][seed] = [sum(s["bins"][i] for s in samples) / 5 for i in range(16)]
     output, incomplete = [], []
     for key, seeds in sorted(groups.items()):
-        if set(seeds) != {0, 1, 2}:
+        if tuple(sorted(seeds)) != expected_seeds:
             incomplete.append(
                 {
                     "task": key[0],
@@ -57,7 +60,10 @@ def aggregate(rows):
                 "task": key[0],
                 "mode": key[1],
                 "intervention": key[2],
-                "bins": [sum(seeds[s][i] for s in range(3)) / 3 for i in range(16)],
+                "bins": [
+                    sum(seeds[s][i] for s in expected_seeds) / len(expected_seeds)
+                    for i in range(16)
+                ],
             }
         )
     return output, incomplete

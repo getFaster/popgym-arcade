@@ -225,7 +225,8 @@ def build_update(
             batch, last_value, config["GAMMA"], config["GAE_LAMBDA"]
         )
 
-        def loss(model, memory, trajectory, advantage, target):
+        def loss(parameters, frozen, memory, trajectory, advantage, target):
+            model = eqx.combine(parameters, frozen)
             _, (logits, value, kl) = model.sequence(
                 memory,
                 trajectory.obs,
@@ -337,20 +338,19 @@ def build_update(
             def array_minibatch(carry, indices):
                 dynamic_model, optimizer_state = carry
                 model = eqx.combine(dynamic_model, static)
+                parameters, frozen = model.partition_trainable()
                 memory = jax.tree.map(lambda x: x[indices], initial_memory)
                 trajectory, advantage, target = jax.tree.map(
                     lambda x: x[:, indices], (batch, advantages, targets)
                 )
                 (_, metrics), grads = eqx.filter_value_and_grad(loss, has_aux=True)(
-                    model, memory, trajectory, advantage, target
+                    parameters, frozen, memory, trajectory, advantage, target
                 )
                 if log_gradients:
                     metrics = jnp.concatenate(
                         (metrics, gradient_norm_metrics(grads, config["MAX_GRAD_NORM"]))
                     )
-                changes, optimizer_state = tx.update(
-                    grads, optimizer_state, eqx.filter(model, eqx.is_inexact_array)
-                )
+                changes, optimizer_state = tx.update(grads, optimizer_state, parameters)
                 model = eqx.apply_updates(model, changes)
                 return (eqx.filter(model, eqx.is_array), optimizer_state), metrics
 
@@ -825,7 +825,8 @@ def run_one(args, variant, seed, config):
         else optax.adam(schedule, eps=1e-5)
     )
     tx = optax.chain(optax.clip_by_global_norm(config["MAX_GRAD_NORM"]), optimizer)
-    opt_state = tx.init(eqx.filter(network, eqx.is_inexact_array))
+    trainable, _ = network.partition_trainable()
+    opt_state = tx.init(trainable)
     rng, reset_key = jax.random.split(jax.random.PRNGKey(seed + 10_000))
     obs, state = jax.vmap(env.reset, in_axes=(0, None))(
         jax.random.split(reset_key, n), params
@@ -899,6 +900,7 @@ def run_one(args, variant, seed, config):
         "parameter_count": sum(
             x.size for x in jax.tree.leaves(eqx.filter(network, eqx.is_inexact_array))
         ),
+        "trainable_parameter_count": sum(x.size for x in jax.tree.leaves(trainable)),
         "source_sha256": {
             path.name: hashlib.sha256(path.read_bytes()).hexdigest()
             for path in (

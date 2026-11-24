@@ -11,6 +11,7 @@ DEFAULT_IB_VARIANT = "ib_reverse_prior20"
 DEFAULT_IB_POSTERIOR_INPUT = "output"
 DEFAULT_IB_RESIDUAL = True
 DEFAULT_IB_NORMALIZATION = "fixed_rms"
+ESN_VARIANT = "lru_esn"
 
 ORIGINAL_VARIANTS = (
     "mlp",
@@ -61,7 +62,7 @@ KL_BALANCES["ib_reverse_prior20_prediction"] = 0.2
 
 VARIANTS = (
     ORIGINAL_VARIANTS
-    + ("lru_prediction", "mlp_prediction")
+    + ("lru_prediction", "mlp_prediction", ESN_VARIANT)
     + tuple(k for k in IB_DIVERGENCES if k not in ORIGINAL_VARIANTS)
 )
 
@@ -551,6 +552,32 @@ class MemoryActorCritic(eqx.Module):
     def initial_state(self, batch_size):
         shape = (batch_size, self.actor.layers, self.actor.hidden)
         return jnp.zeros(shape, jnp.complex64), jnp.zeros(shape, jnp.complex64)
+
+    def partition_trainable(self):
+        """Only the LRU state-update parameters are frozen in the ESN variant."""
+        if self.actor.variant != ESN_VARIANT:
+            return eqx.partition(self, eqx.is_inexact_array)
+
+        def dynamics(model):
+            return tuple(
+                weight
+                for branch in (model.actor, model.critic)
+                for cell in branch.cells
+                for weight in (
+                    cell.nu,
+                    cell.theta,
+                    cell.gamma,
+                    cell.b_real,
+                    cell.b_imag,
+                )
+            )
+
+        spec = eqx.tree_at(
+            dynamics,
+            jax.tree.map(eqx.is_inexact_array, self),
+            replace_fn=lambda _: False,
+        )
+        return eqx.partition(self, spec)
 
     def encode(self, obs, action, reward, done):
         return (

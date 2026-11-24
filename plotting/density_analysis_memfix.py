@@ -20,7 +20,7 @@ from distreqx import distributions
 
 import popgym_arcade
 from plotting.density_analysis_ppo import normalize_recall_gradients
-from popgym_arcade.experiments.memory_models import MemoryActorCritic
+from popgym_arcade.experiments.memory_models import ESN_VARIANT, MemoryActorCritic
 
 
 def bin_distribution(distribution, bins=16):
@@ -152,6 +152,8 @@ def step_env(env, key, state, action, params):
 
 
 def family(m):
+    if m["variant"] == ESN_VARIANT:
+        return "Frozen LRU dynamics"
     if (
         m["variant"] == "lru"
         and m.get("recurrent_state_quantization", "none") == "none"

@@ -13,6 +13,7 @@ import pytest
 from popgym_arcade.experiments.memory_models import (
     IB_DIVERGENCES,
     Branch,
+    MemoryActorCritic,
     diagonal_kl,
     free_bit,
     gaussian_divergence,
@@ -62,7 +63,9 @@ def test_ib_parameters_and_state_dependent_heads():
     assert jnp.isfinite(kl0)
 
 
-@pytest.mark.parametrize("variant", ["lru", "state_dropout", *IB_DIVERGENCES])
+@pytest.mark.parametrize(
+    "variant", ["lru", "lru_esn", "state_dropout", *IB_DIVERGENCES]
+)
 def test_reset_and_replay(variant):
     branch = make_branch(variant)
     x = jnp.ones(518)
@@ -76,6 +79,81 @@ def test_reset_and_replay(variant):
     ):
         np.testing.assert_array_equal(actual, expected)
         np.testing.assert_array_equal(actual, repeated)
+
+
+def test_esn_freezes_only_lru_dynamics_in_ppo():
+    import optax
+
+    import popgym_arcade
+    from popgym_arcade.experiments.memory_bias import (
+        Runner,
+        build_update,
+        upstream_config,
+    )
+    from popgym_arcade.wrappers import LogWrapper
+
+    config = upstream_config() | {
+        "NUM_ENVS": 1,
+        "NUM_STEPS": 4,
+        "NUM_MINIBATCHES": 1,
+        "UPDATE_EPOCHS": 1,
+    }
+    env, params = popgym_arcade.make("CartPoleHard", partial_obs=True, obs_size=128)
+    env = LogWrapper(env)
+    key = jax.random.PRNGKey(0)
+    model = MemoryActorCritic("lru_esn", key, hidden=4, layers=2)
+    baseline = MemoryActorCritic("lru", key, hidden=4, layers=2)
+    for expected, actual in zip(
+        jax.tree.leaves(eqx.filter(baseline, eqx.is_array)),
+        jax.tree.leaves(eqx.filter(model, eqx.is_array)),
+        strict=True,
+    ):
+        np.testing.assert_array_equal(actual, expected)
+
+    trainable, frozen = model.partition_trainable()
+    expected_frozen = ("nu", "theta", "gamma", "b_real", "b_imag")
+    for branch in (frozen.actor, frozen.critic):
+        assert len(jax.tree.leaves(eqx.filter(branch, eqx.is_array))) == 2 * len(
+            expected_frozen
+        )
+        for cell in branch.cells:
+            assert all(getattr(cell, field) is not None for field in expected_frozen)
+    tx = optax.adam(config["LR"])
+    obs, state = jax.vmap(env.reset, in_axes=(0, None))(
+        jax.random.split(jax.random.PRNGKey(1), 1), params
+    )
+    runner = Runner(
+        state,
+        obs,
+        jnp.zeros(1, jnp.int32),
+        jnp.zeros(1),
+        jnp.ones(1, bool),
+        model.initial_state(1),
+        jax.random.PRNGKey(2),
+    )
+    update = build_update(env, params, config, tx, 1.0)
+    updated, _, _, metrics, _, _ = update(model, tx.init(trainable), runner)
+    assert np.isfinite(metrics).all()
+    updated_trainable, updated_frozen = updated.partition_trainable()
+    for old, new in zip(
+        jax.tree.leaves(eqx.filter(frozen, eqx.is_array)),
+        jax.tree.leaves(eqx.filter(updated_frozen, eqx.is_array)),
+        strict=True,
+    ):
+        np.testing.assert_array_equal(new, old)
+    for old, new in (
+        (trainable.actor, updated_trainable.actor),
+        (trainable.critic, updated_trainable.critic),
+    ):
+        for field in ("cnn", "cells", "memory_projection", "head"):
+            assert any(
+                not np.array_equal(a, b)
+                for a, b in zip(
+                    jax.tree.leaves(getattr(old, field)),
+                    jax.tree.leaves(getattr(new, field)),
+                    strict=True,
+                )
+            ), field
 
 
 def test_dropout_changes_transition_and_eval_disables_it():
@@ -122,7 +200,9 @@ def test_gae_stops_at_episode_boundary():
     assert config["TOTAL_TIMESTEPS"] == 10_000_000
 
 
-@pytest.mark.parametrize("variant", ["lru", "state_dropout", *IB_DIVERGENCES])
+@pytest.mark.parametrize(
+    "variant", ["lru", "lru_esn", "state_dropout", *IB_DIVERGENCES]
+)
 def test_rollout_probabilities_match_sequence_replay(variant):
     from popgym_arcade.experiments.memory_models import MemoryActorCritic
 

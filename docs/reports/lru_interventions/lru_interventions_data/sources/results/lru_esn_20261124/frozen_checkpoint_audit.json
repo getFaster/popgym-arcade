@@ -1,0 +1,10 @@
+{
+  "CartPoleHard/mdp": "1ac3fcd2d79aaac9cc0fb10a0a89b7b48c9f9e3d9c4f0df303acfe0a4872af96",
+  "CartPoleHard/pomdp": "1ac3fcd2d79aaac9cc0fb10a0a89b7b48c9f9e3d9c4f0df303acfe0a4872af96",
+  "NavigatorEasy/mdp": "1ac3fcd2d79aaac9cc0fb10a0a89b7b48c9f9e3d9c4f0df303acfe0a4872af96",
+  "NavigatorEasy/pomdp": "1ac3fcd2d79aaac9cc0fb10a0a89b7b48c9f9e3d9c4f0df303acfe0a4872af96",
+  "MineSweeperEasy/mdp": "1ac3fcd2d79aaac9cc0fb10a0a89b7b48c9f9e3d9c4f0df303acfe0a4872af96",
+  "MineSweeperEasy/pomdp": "1ac3fcd2d79aaac9cc0fb10a0a89b7b48c9f9e3d9c4f0df303acfe0a4872af96",
+  "BreakoutEasy/mdp": "1ac3fcd2d79aaac9cc0fb10a0a89b7b48c9f9e3d9c4f0df303acfe0a4872af96",
+  "BreakoutEasy/pomdp": "1ac3fcd2d79aaac9cc0fb10a0a89b7b48c9f9e3d9c4f0df303acfe0a4872af96"
+}

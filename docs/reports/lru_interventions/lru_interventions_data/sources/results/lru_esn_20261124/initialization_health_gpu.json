@@ -1,0 +1,545 @@
+{
+  "model_seed": 0,
+  "uniform_random_policy_seed": 900000,
+  "environments_per_task_mode": 16,
+  "steps_per_environment": 128,
+  "backend": "gpu",
+  "device": "NVIDIA GeForce RTX 2060 with Max-Q Design",
+  "frozen_parameter_sha256": "1ac3fcd2d79aaac9cc0fb10a0a89b7b48c9f9e3d9c4f0df303acfe0a4872af96",
+  "spectrum": {
+    "actor": [
+      {
+        "radii_min_median_max": [
+          0.0008906754083000124,
+          0.5219921469688416,
+          0.9872274994850159
+        ],
+        "phase_radians_min_max": [
+          0.0028922795318067074,
+          6.280017852783203
+        ],
+        "phase_quadrant_counts": [
+          103,
+          146,
+          116,
+          147
+        ],
+        "half_life_steps_median_p95_max": [
+          1.0662299134671902,
+          16.916586109136407,
+          53.92139812971511
+        ],
+        "modes_with_half_life_at_least_16_steps": 27,
+        "modes_with_half_life_at_least_32_steps": 7,
+        "input_map_rank": 518,
+        "input_map_condition_number": 6.879276387615067,
+        "white_input_stationary_rms_min_median_max": [
+          0.916399359703064,
+          0.9994480311870575,
+          1.0646498203277588
+        ],
+        "delay_gain_relative_to_current_input": {
+          "1": 0.46200938434004685,
+          "4": 0.17870954989220217,
+          "16": 0.055170817315897715,
+          "32": 0.02946555310824481,
+          "64": 0.012619744463538083
+        }
+      },
+      {
+        "radii_min_median_max": [
+          0.0009957110742107034,
+          0.48160116374492645,
+          0.9845597147941589
+        ],
+        "phase_radians_min_max": [
+          0.018649790436029434,
+          6.268784046173096
+        ],
+        "phase_quadrant_counts": [
+          140,
+          109,
+          137,
+          126
+        ],
+        "half_life_steps_median_p95_max": [
+          0.9486863048290253,
+          11.018950408311744,
+          44.544650457321886
+        ],
+        "modes_with_half_life_at_least_16_steps": 17,
+        "modes_with_half_life_at_least_32_steps": 5,
+        "input_map_rank": 512,
+        "input_map_condition_number": 6.7942667992998205,
+        "white_input_stationary_rms_min_median_max": [
+          0.9116619825363159,
+          1.0001820921897888,
+          1.0706937313079834
+        ],
+        "delay_gain_relative_to_current_input": {
+          "1": 0.44503846312515516,
+          "4": 0.17460582136178968,
+          "16": 0.049954728079342293,
+          "32": 0.023790102203306882,
+          "64": 0.009370379267184675
+        }
+      }
+    ],
+    "critic": [
+      {
+        "radii_min_median_max": [
+          0.0009577087475918233,
+          0.5121584832668304,
+          0.9894434809684753
+        ],
+        "phase_radians_min_max": [
+          0.008115071803331375,
+          6.266055107116699
+        ],
+        "phase_quadrant_counts": [
+          145,
+          113,
+          131,
+          123
+        ],
+        "half_life_steps_median_p95_max": [
+          1.0359398568507414,
+          12.62293633785767,
+          65.31339512218898
+        ],
+        "modes_with_half_life_at_least_16_steps": 18,
+        "modes_with_half_life_at_least_32_steps": 5,
+        "input_map_rank": 518,
+        "input_map_condition_number": 6.726101872253334,
+        "white_input_stationary_rms_min_median_max": [
+          0.9353868961334229,
+          1.0005282163619995,
+          1.0780397653579712
+        ],
+        "delay_gain_relative_to_current_input": {
+          "1": 0.4522586481344647,
+          "4": 0.17584916513420543,
+          "16": 0.050337860110353405,
+          "32": 0.02493095737183575,
+          "64": 0.010385737472902959
+        }
+      },
+      {
+        "radii_min_median_max": [
+          0.00024205319641623646,
+          0.5143358409404755,
+          0.9877849221229553
+        ],
+        "phase_radians_min_max": [
+          0.017426664009690285,
+          6.270230770111084
+        ],
+        "phase_quadrant_counts": [
+          117,
+          133,
+          138,
+          124
+        ],
+        "half_life_steps_median_p95_max": [
+          1.0425167563293942,
+          13.869522200508516,
+          56.39792823675317
+        ],
+        "modes_with_half_life_at_least_16_steps": 18,
+        "modes_with_half_life_at_least_32_steps": 7,
+        "input_map_rank": 512,
+        "input_map_condition_number": 6.918093059785039,
+        "white_input_stationary_rms_min_median_max": [
+          0.9328774809837341,
+          0.997523844242096,
+          1.0611863136291504
+        ],
+        "delay_gain_relative_to_current_input": {
+          "1": 0.4478898422224395,
+          "4": 0.18047674961572754,
+          "16": 0.055607070824555016,
+          "32": 0.027113399265539028,
+          "64": 0.011670599755073195
+        }
+      }
+    ]
+  },
+  "task_responses": {
+    "CartPoleHard/mdp": {
+      "completed_episodes": 61,
+      "actor": [
+        {
+          "state_rms": 0.05324770510196686,
+          "coordinate_rms_min_median_max": [
+            0.015169605612754822,
+            0.04624050483107567,
+            0.1637016236782074
+          ],
+          "max_coordinate_magnitude": 0.26477253437042236,
+          "centered_covariance_participation_ratio": 8.358926312813345
+        },
+        {
+          "state_rms": 0.051002103835344315,
+          "coordinate_rms_min_median_max": [
+            0.01165996678173542,
+            0.04245424084365368,
+            0.15236622095108032
+          ],
+          "max_coordinate_magnitude": 0.2685423791408539,
+          "centered_covariance_participation_ratio": 11.62464716600681
+        }
+      ],
+      "critic": [
+        {
+          "state_rms": 0.05266796052455902,
+          "coordinate_rms_min_median_max": [
+            0.016009746119379997,
+            0.04651203006505966,
+            0.15402650833129883
+          ],
+          "max_coordinate_magnitude": 0.27499133348464966,
+          "centered_covariance_participation_ratio": 8.161177041289132
+        },
+        {
+          "state_rms": 0.049768321216106415,
+          "coordinate_rms_min_median_max": [
+            0.013344336301088333,
+            0.04199734330177307,
+            0.16021569073200226
+          ],
+          "max_coordinate_magnitude": 0.28841811418533325,
+          "centered_covariance_participation_ratio": 11.91644193146831
+        }
+      ]
+    },
+    "CartPoleHard/pomdp": {
+      "completed_episodes": 61,
+      "actor": [
+        {
+          "state_rms": 0.05155227333307266,
+          "coordinate_rms_min_median_max": [
+            0.014955999329686165,
+            0.04549863561987877,
+            0.15682418644428253
+          ],
+          "max_coordinate_magnitude": 0.2595091760158539,
+          "centered_covariance_participation_ratio": 8.32431897570149
+        },
+        {
+          "state_rms": 0.04899389669299126,
+          "coordinate_rms_min_median_max": [
+            0.01228630542755127,
+            0.04141455516219139,
+            0.15103888511657715
+          ],
+          "max_coordinate_magnitude": 0.23467187583446503,
+          "centered_covariance_participation_ratio": 11.514105646429948
+        }
+      ],
+      "critic": [
+        {
+          "state_rms": 0.05103517696261406,
+          "coordinate_rms_min_median_max": [
+            0.015216835774481297,
+            0.045670757070183754,
+            0.15906286239624023
+          ],
+          "max_coordinate_magnitude": 0.2662656903266907,
+          "centered_covariance_participation_ratio": 8.082231351421832
+        },
+        {
+          "state_rms": 0.0480557382106781,
+          "coordinate_rms_min_median_max": [
+            0.013975273817777634,
+            0.040941694751381874,
+            0.1495276242494583
+          ],
+          "max_coordinate_magnitude": 0.2792568504810333,
+          "centered_covariance_participation_ratio": 11.911609022349925
+        }
+      ]
+    },
+    "NavigatorEasy/mdp": {
+      "completed_episodes": 98,
+      "actor": [
+        {
+          "state_rms": 0.056002430617809296,
+          "coordinate_rms_min_median_max": [
+            0.015531925484538078,
+            0.047565676271915436,
+            0.17784659564495087
+          ],
+          "max_coordinate_magnitude": 0.32945388555526733,
+          "centered_covariance_participation_ratio": 8.505163962264495
+        },
+        {
+          "state_rms": 0.05304373800754547,
+          "coordinate_rms_min_median_max": [
+            0.011142509058117867,
+            0.04372255317866802,
+            0.16298669576644897
+          ],
+          "max_coordinate_magnitude": 0.3167879581451416,
+          "centered_covariance_participation_ratio": 11.88467377775214
+        }
+      ],
+      "critic": [
+        {
+          "state_rms": 0.055786292999982834,
+          "coordinate_rms_min_median_max": [
+            0.016131268814206123,
+            0.04751849174499512,
+            0.19499167799949646
+          ],
+          "max_coordinate_magnitude": 0.35216063261032104,
+          "centered_covariance_participation_ratio": 8.475977178772704
+        },
+        {
+          "state_rms": 0.05185576528310776,
+          "coordinate_rms_min_median_max": [
+            0.012819385156035423,
+            0.044129395857453346,
+            0.16762571036815643
+          ],
+          "max_coordinate_magnitude": 0.28080934286117554,
+          "centered_covariance_participation_ratio": 12.121043379400776
+        }
+      ]
+    },
+    "NavigatorEasy/pomdp": {
+      "completed_episodes": 98,
+      "actor": [
+        {
+          "state_rms": 0.05551163852214813,
+          "coordinate_rms_min_median_max": [
+            0.015663467347621918,
+            0.047438425943255424,
+            0.1724286526441574
+          ],
+          "max_coordinate_magnitude": 0.32445141673088074,
+          "centered_covariance_participation_ratio": 8.457567182181291
+        },
+        {
+          "state_rms": 0.05257810279726982,
+          "coordinate_rms_min_median_max": [
+            0.011197076179087162,
+            0.043458759784698486,
+            0.1600102186203003
+          ],
+          "max_coordinate_magnitude": 0.3142990469932556,
+          "centered_covariance_participation_ratio": 11.82157765362924
+        }
+      ],
+      "critic": [
+        {
+          "state_rms": 0.05526159703731537,
+          "coordinate_rms_min_median_max": [
+            0.016094554215669632,
+            0.047187699005007744,
+            0.18846294283866882
+          ],
+          "max_coordinate_magnitude": 0.3363022208213806,
+          "centered_covariance_participation_ratio": 8.408193186919846
+        },
+        {
+          "state_rms": 0.051437996327877045,
+          "coordinate_rms_min_median_max": [
+            0.012970569543540478,
+            0.04372267797589302,
+            0.1667119562625885
+          ],
+          "max_coordinate_magnitude": 0.2735171616077423,
+          "centered_covariance_participation_ratio": 12.04438058832595
+        }
+      ]
+    },
+    "MineSweeperEasy/mdp": {
+      "completed_episodes": 76,
+      "actor": [
+        {
+          "state_rms": 0.0570710152387619,
+          "coordinate_rms_min_median_max": [
+            0.0132980952039361,
+            0.047616153955459595,
+            0.185162752866745
+          ],
+          "max_coordinate_magnitude": 0.3274826109409332,
+          "centered_covariance_participation_ratio": 8.686208341570973
+        },
+        {
+          "state_rms": 0.054054297506809235,
+          "coordinate_rms_min_median_max": [
+            0.010701455175876617,
+            0.045548440888524055,
+            0.15191657841205597
+          ],
+          "max_coordinate_magnitude": 0.3136078417301178,
+          "centered_covariance_participation_ratio": 11.971083179552235
+        }
+      ],
+      "critic": [
+        {
+          "state_rms": 0.056515105068683624,
+          "coordinate_rms_min_median_max": [
+            0.015294766053557396,
+            0.048169126734137535,
+            0.17810417711734772
+          ],
+          "max_coordinate_magnitude": 0.29736050963401794,
+          "centered_covariance_participation_ratio": 8.475972918319934
+        },
+        {
+          "state_rms": 0.05323841795325279,
+          "coordinate_rms_min_median_max": [
+            0.01380960177630186,
+            0.04490993916988373,
+            0.1687794178724289
+          ],
+          "max_coordinate_magnitude": 0.2899787425994873,
+          "centered_covariance_participation_ratio": 12.176659154603373
+        }
+      ]
+    },
+    "MineSweeperEasy/pomdp": {
+      "completed_episodes": 76,
+      "actor": [
+        {
+          "state_rms": 0.05600849166512489,
+          "coordinate_rms_min_median_max": [
+            0.013216095976531506,
+            0.04724773392081261,
+            0.1776578724384308
+          ],
+          "max_coordinate_magnitude": 0.3038374185562134,
+          "centered_covariance_participation_ratio": 8.493494702561646
+        },
+        {
+          "state_rms": 0.05303614214062691,
+          "coordinate_rms_min_median_max": [
+            0.010866922326385975,
+            0.04457857646048069,
+            0.14973871409893036
+          ],
+          "max_coordinate_magnitude": 0.2924274206161499,
+          "centered_covariance_participation_ratio": 11.715187497337828
+        }
+      ],
+      "critic": [
+        {
+          "state_rms": 0.05557537078857422,
+          "coordinate_rms_min_median_max": [
+            0.0152495251968503,
+            0.047610294073820114,
+            0.18187068402767181
+          ],
+          "max_coordinate_magnitude": 0.29523763060569763,
+          "centered_covariance_participation_ratio": 8.305502400124606
+        },
+        {
+          "state_rms": 0.05240560322999954,
+          "coordinate_rms_min_median_max": [
+            0.01380147971212864,
+            0.04420899413526058,
+            0.16398558020591736
+          ],
+          "max_coordinate_magnitude": 0.2905213236808777,
+          "centered_covariance_participation_ratio": 11.978141904559205
+        }
+      ]
+    },
+    "BreakoutEasy/mdp": {
+      "completed_episodes": 22,
+      "actor": [
+        {
+          "state_rms": 0.05495385825634003,
+          "coordinate_rms_min_median_max": [
+            0.017763672396540642,
+            0.04662581346929073,
+            0.17637194693088531
+          ],
+          "max_coordinate_magnitude": 0.2658827304840088,
+          "centered_covariance_participation_ratio": 8.577753533145584
+        },
+        {
+          "state_rms": 0.05230776593089104,
+          "coordinate_rms_min_median_max": [
+            0.01522838231176138,
+            0.043538257479667664,
+            0.16704531013965607
+          ],
+          "max_coordinate_magnitude": 0.2698807120323181,
+          "centered_covariance_participation_ratio": 12.007146214420608
+        }
+      ],
+      "critic": [
+        {
+          "state_rms": 0.05530641973018646,
+          "coordinate_rms_min_median_max": [
+            0.017236970365047455,
+            0.04781360179185867,
+            0.19780944287776947
+          ],
+          "max_coordinate_magnitude": 0.3042067885398865,
+          "centered_covariance_participation_ratio": 8.43610857185836
+        },
+        {
+          "state_rms": 0.05189662426710129,
+          "coordinate_rms_min_median_max": [
+            0.01593576930463314,
+            0.04412575624883175,
+            0.19775128364562988
+          ],
+          "max_coordinate_magnitude": 0.3151726722717285,
+          "centered_covariance_participation_ratio": 12.415847074579178
+        }
+      ]
+    },
+    "BreakoutEasy/pomdp": {
+      "completed_episodes": 22,
+      "actor": [
+        {
+          "state_rms": 0.05494823306798935,
+          "coordinate_rms_min_median_max": [
+            0.01778571866452694,
+            0.04667539335787296,
+            0.17623260617256165
+          ],
+          "max_coordinate_magnitude": 0.26619696617126465,
+          "centered_covariance_participation_ratio": 8.57245922971349
+        },
+        {
+          "state_rms": 0.052302490919828415,
+          "coordinate_rms_min_median_max": [
+            0.015346825122833252,
+            0.0435058418661356,
+            0.16688966751098633
+          ],
+          "max_coordinate_magnitude": 0.27018478512763977,
+          "centered_covariance_participation_ratio": 11.999753526215825
+        }
+      ],
+      "critic": [
+        {
+          "state_rms": 0.05530617758631706,
+          "coordinate_rms_min_median_max": [
+            0.017000000923871994,
+            0.04779641143977642,
+            0.19733552634716034
+          ],
+          "max_coordinate_magnitude": 0.30381813645362854,
+          "centered_covariance_participation_ratio": 8.433399012027381
+        },
+        {
+          "state_rms": 0.051879774779081345,
+          "coordinate_rms_min_median_max": [
+            0.015848210081458092,
+            0.04407564736902714,
+            0.19770851731300354
+          ],
+          "max_coordinate_magnitude": 0.31534087657928467,
+          "centered_covariance_participation_ratio": 12.407870821260264
+        }
+      ]
+    }
+  }
+}
